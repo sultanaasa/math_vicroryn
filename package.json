@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "A cheerful real-time multiplayer hide-and-seek game",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
+  "scripts": { "start": "node server.js", "test": "node test-server.js" },
   "dependencies": { "ws": "^8.18.0" }
 }

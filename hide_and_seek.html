@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hide & Seek / Хованки 3D</title>
-  <!-- Three.js r128 & PeerJS 1.5.4 (pinned versions) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <title>Хованки — грай, ховайся, знаходь</title>
+  <script src="vendor/three.min.js"></script>
+  <script src="community.js"></script>
   <style>
     /* ===== RESET & FLAT WARM DESIGN SYSTEM ===== */
     *, *::before, *::after {
@@ -263,6 +262,7 @@
     .stats-table th { font-weight: 700; color: var(--text-muted); }
     .player-tag { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
   </style>
+  <link rel="stylesheet" href="community.css">
 </head>
 <body>
 
@@ -300,9 +300,11 @@
       <span class="key-badge">Space</span>
       <span id="prompt-text">Знайти гравця!</span>
     </div>
+    <div id="controls-tip">W S — рух · A D — поворот · Пробіл — знайти · Esc — меню</div>
+    <div id="touch-controls"><button data-move="left" aria-label="Ліворуч">↶</button><button data-move="forward" aria-label="Вперед">↑</button><button data-move="backward" aria-label="Назад">↓</button><button data-move="right" aria-label="Праворуч">↷</button><button id="touch-action" aria-label="Знайти">⌕</button></div>
   </div>
 
-  <div id="toast-container"></div>
+  <div id="toast-container" aria-live="polite"></div>
 
   <div id="blindfold-overlay">
     <div id="blindfold-title">ХОВАНКИ!</div>
@@ -322,33 +324,50 @@
     </form>
   </div>
 
-  <!-- SCREEN: MENU -->
   <div class="screen-overlay" id="screen-menu">
     <div class="modal-card">
-      <div class="modal-title">
-        <span>Хованки / Hide & Seek 3D</span>
-        <button class="small outline" id="btn-lang-toggle">UA | EN</button>
-      </div>
-      <div class="modal-subtitle" id="lbl-menu-sub">Затишна тривимірна гра в хованки у 5 унікальних локаціях</div>
-      <div style="display:flex; flex-direction:column; gap:4px;">
-        <label for="input-nick" style="font-weight:700; font-size:12px; color:var(--text-muted);" id="lbl-nickname">Ваш нікнейм:</label>
-        <input type="text" id="input-nick" maxlength="14" value="Гравець">
-      </div>
+      <div class="brand-kicker">Великі пригоди починаються зі схованки</div>
+      <div class="menu-heading"><h1>Хованки</h1><button class="small outline" id="btn-lang-toggle">UA | EN</button></div>
+      <p class="modal-subtitle" id="lbl-menu-sub">Знайомі місця. Таємні схованки. Збирай друзів — і гайда грати!</p>
+      <button class="person-card" id="my-card"><span class="avatar" id="my-card-avatar">🦊</span><span><strong id="my-card-name">Твоя пригода починається тут</strong><small id="my-card-status">Створи картку та обери нікнейм</small></span><span>↗</span></button>
       <div class="btn-stack">
-        <button id="btn-play-solo" class="secondary">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-          <span id="lbl-btn-solo">Грати соло (Шукач проти 10 ботів)</span>
-        </button>
-        <button id="btn-play-friends">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
-          <span id="lbl-btn-friends">Грати з друзями (Онлайн)</span>
-        </button>
-        <div class="btn-row">
-          <button class="outline" id="btn-rules"><span id="lbl-btn-rules">Правила гри</span></button>
-          <button class="outline" id="btn-settings"><span id="lbl-btn-settings">Налаштування</span></button>
-        </div>
+        <button id="btn-play-solo" class="secondary"><span>⌕</span><span id="lbl-btn-solo">Грати самому · 10 ботів</span></button>
+        <button id="btn-play-friends"><span>♧</span><span id="lbl-btn-friends">Грати з друзями</span></button>
+        <button id="btn-community" class="outline">Гравці та друзі <span id="friends-count">0</span></button>
+        <div class="btn-row"><button class="outline" id="btn-rules"><span id="lbl-btn-rules">Як грати</span></button><button class="outline" id="btn-settings"><span id="lbl-btn-settings">Налаштування</span></button></div>
       </div>
+      <div class="menu-footnote"><span>3D-світ · 120 × 120 м</span><span id="connection-state">Підключення…</span></div>
     </div>
+  </div>
+  <div class="screen-overlay" id="modal-profile" style="display:none">
+    <div class="modal-card">
+      <div class="modal-title"><span>Твоя картка гравця</span><button class="small outline" data-close="modal-profile" aria-label="Закрити">×</button></div>
+      <p class="modal-subtitle">Обери нікнейм, щоб друзі впізнали тебе. Картку можна змінити будь-коли між раундами.</p>
+      <form id="profile-form">
+        <label class="field" for="input-nick"><span id="lbl-nickname">Нікнейм</span><input id="input-nick" type="text" minlength="2" maxlength="16" required placeholder="Наприклад, ЛісовийЛис" autocomplete="nickname"></label>
+        <div class="btn-row"><label class="field">Аватар<select id="profile-avatar"><option value="fox">🦊 Лис</option><option value="owl">🦉 Сова</option><option value="leaf">🌿 Листок</option><option value="star">⭐ Зірка</option></select></label><label class="field">Колір персонажа<input type="color" id="profile-color" value="#D9822B"></label></div>
+        <p class="error-message" id="profile-error" role="alert"></p>
+        <button type="submit" class="secondary">Зберегти картку</button>
+      </form>
+    </div>
+  </div>
+  <div class="screen-overlay" id="modal-community" style="display:none">
+    <div class="modal-card community-card">
+      <div class="modal-title"><span>Твоя компанія</span><button class="small outline" data-close="modal-community" aria-label="Закрити">×</button></div>
+      <p class="modal-subtitle">Усі зареєстровані гравці цього сервера. Натисни на картку, щоб додати друга.</p>
+      <input type="text" id="player-search" placeholder="Знайти за нікнеймом" aria-label="Пошук гравців">
+      <div class="directory-columns"><section><h3>Мої друзі</h3><div class="directory-list" id="friend-list"></div></section><section><h3>Усі гравці</h3><div class="directory-list" id="all-players"></div></section></div>
+    </div>
+  </div>
+  <div class="screen-overlay" id="modal-person" style="display:none">
+    <div class="modal-card" style="max-width:380px">
+      <div class="modal-title"><span>Картка гравця</span><button class="small outline" data-close="modal-person" aria-label="Закрити">×</button></div>
+      <span class="avatar" id="person-avatar"></span><div class="profile-details"><h2 id="person-name"></h2><p id="person-status"></p></div>
+      <button class="secondary" id="add-friend">Додати в друзі</button><button id="invite-friend" hidden>Запросити до кімнати</button><button class="outline" id="make-seeker" hidden>Призначити шукачем</button>
+    </div>
+  </div>
+  <div class="screen-overlay" id="modal-invite" style="display:none">
+    <div class="modal-card"><div class="modal-title">Гайда грати разом!</div><p id="invite-text"></p><button id="accept-invite" class="secondary">Приєднатися</button><button class="outline" data-close="modal-invite">Не зараз</button></div>
   </div>
 
   <!-- SCREEN: MULTIPLAYER -->
@@ -366,7 +385,7 @@
           <button id="btn-mp-join" class="outline"><span id="lbl-btn-join">Приєднатися</span></button>
         </div>
         <hr style="border:0; border-top:1px solid var(--border);">
-        <button id="btn-mp-local" class="outline"><span id="lbl-btn-local-test">Локальний тест (Вкладки)</span></button>
+        <button id="btn-mp-local" class="outline" hidden><span id="lbl-btn-local-test">Локальний тест (Вкладки)</span></button>
       </div>
     </div>
   </div>
@@ -374,16 +393,11 @@
   <!-- SCREEN: WHEEL -->
   <div class="screen-overlay" id="screen-wheel" style="display:none;">
     <div class="modal-card" style="text-align:center;">
-      <div class="modal-title" style="justify-content:center;"><span id="lbl-wheel-title">Колесо локацій</span></div>
-      <div class="modal-subtitle" id="lbl-wheel-sub">Крутіть колесо, щоб визначити місце гри!</div>
-      <div id="wheel-container">
-        <div id="wheel-pointer"></div>
-        <canvas id="wheel-canvas" width="300" height="300"></canvas>
-      </div>
-      <div id="wheel-result">...</div>
-      <div class="btn-stack">
-        <button id="btn-spin-wheel" class="secondary"><span id="lbl-btn-spin">Крутити колесо!</span></button>
-      </div>
+      <div class="modal-title" style="justify-content:center;"><span id="lbl-wheel-title">Де будемо грати?</span></div>
+      <div class="modal-subtitle" id="lbl-wheel-sub">Чотири локації. Десятки схованок. Обирай свою пригоду.</div>
+      <div id="location-choices" class="location-grid"></div>
+      <p class="help-strip">Ти — шукач. У тебе буде 5 хвилин, щоб знайти 10 ботів. Підійди ближче, подивись на персонажа й натисни Пробіл.</p>
+      <button class="outline" onclick="window.HNS.leaveLobby()">Назад</button>
     </div>
   </div>
 
@@ -405,8 +419,13 @@
         <div style="font-weight:700; font-size:12px; margin-bottom:4px; color:var(--text-muted);" id="lbl-lobby-players">Гравці (<span id="lobby-player-count">1</span>/10):</div>
         <div id="lobby-player-list" style="display:flex; flex-direction:column; gap:4px; max-height:140px; overflow-y:auto;"></div>
       </div>
+      <p id="lobby-role-note"></p>
+      <div id="lobby-locations" class="location-grid"></div>
+      <p class="help-strip">Власник кімнати може призначити шукача через картку гравця. Шукач обирає локацію.</p>
+      <button id="lobby-friends" class="outline">Запросити друзів</button>
+      <input id="invite-link" type="text" readonly hidden aria-label="Посилання на кімнату">
       <div id="lobby-host-controls" style="display:flex; flex-direction:column; gap:8px;">
-        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+        <label style="display:none;">
           <input type="checkbox" id="check-fill-bots" checked>
           <span id="lbl-fill-bots">Заповнити ботами до 10</span>
         </label>
@@ -440,8 +459,8 @@
       </div>
       <div class="btn-stack">
         <button id="btn-next-round" class="secondary"><span id="lbl-btn-next-round">Наступний раунд</span></button>
-        <button id="btn-end-wheel" class="outline"><span id="lbl-btn-new-theme">Крутити колесо знову</span></button>
-        <button class="outline" onclick="window.HNS.showScreen('screen-menu');"><span id="lbl-btn-end-menu">Головне меню</span></button>
+        <button id="btn-end-wheel" class="outline"><span id="lbl-btn-new-theme">Обрати іншу локацію</span></button>
+        <button class="outline" id="btn-end-menu"><span id="lbl-btn-end-menu">Головне меню</span></button>
       </div>
     </div>
   </div>
@@ -528,10 +547,10 @@
     const I18N = {
       uk: {
         gameTitle: "Хованки 3D",
-        subtitle: "Затишна тривимірна гра в хованки у 5 унікальних локаціях",
+        subtitle: "Знайомі місця. Таємні схованки. Збирай друзів — і гайда грати!",
         nickname: "Ваш нікнейм:",
-        btnSolo: "Грати соло (Шукач проти 10 ботів)",
-        btnFriends: "Грати з друзями (Онлайн)",
+        btnSolo: "Грати самому · 10 ботів",
+        btnFriends: "Грати з друзями",
         btnRules: "Правила гри",
         btnSettings: "Налаштування",
         mpTitle: "Мережева гра",
@@ -539,8 +558,8 @@
         btnCreateRoom: "Створити кімнату (Host)",
         btnJoin: "Приєднатися",
         btnLocalTest: "Локальний тест (Вкладки)",
-        wheelTitle: "Колесо локацій",
-        wheelSub: "Крутіть колесо, щоб визначити місце гри!",
+        wheelTitle: "Де будемо грати?",
+        wheelSub: "Чотири локації. Десятки схованок. Обирай свою пригоду.",
         btnSpin: "Крутити колесо!",
         lobbyTitle: "Лобі кімнати",
         lobbyTheme: "Обрана тема:",
@@ -573,7 +592,7 @@
         statusHidden: "Не знайдено!",
         nextSeekerTitle: "Наступний шукач:",
         btnNextRound: "Наступний раунд",
-        btnNewTheme: "Крутити колесо знову",
+        btnNewTheme: "Обрати іншу локацію",
         btnEndMenu: "Головне меню",
         rulesTitle: "Правила гри",
         rulesClose: "Зрозуміло",
@@ -592,8 +611,8 @@
         themeNames: {
           forest: "Ліс",
           school: "Школа",
-          aquapark: "Аквапарк",
-          playground: "Парк з майданчиками",
+          aquapark: "Басейн",
+          playground: "Парк",
           mountains: "Гори"
         },
         rulesContent: `
@@ -601,7 +620,7 @@
           <p><b>Мета тих, хто ховається:</b> залишатися непоміченими якомога довше.</p>
           <p><b>Початок раунду:</b> шукач заплющує очі й рахує 20 секунд. За цей час гравці ховаються на локації.</p>
           <p><b>Як знайти:</b> підійдіть до гравця ближче ніж на 3 метри, подивіться на нього та натисніть <b>Пробіл</b>.</p>
-          <p><b>Наступний шукач:</b> гравець, якого знайшли першим, шукає наступним (або голосування в чаті <code>/seeker Nick</code>).</p>
+          <p><b>Наступний шукач:</b> гравець, якого знайшли першим, шукає наступним. Власник кімнати може змінити шукача через картку в лобі.</p>
           <p><b>Завдання:</b> виконання завдань дає підказки, додатковий час та бонусні бали.</p>
           <p><b>Керування:</b> стрілочки (↑ ↓ ← →) або W A S D — рух і поворот, Space — дія, Enter — чат, Esc — меню.</p>
         `,
@@ -668,8 +687,8 @@
         btnCreateRoom: "Create Room (Host)",
         btnJoin: "Join Room",
         btnLocalTest: "Local Test (Tabs)",
-        wheelTitle: "Theme Wheel",
-        wheelSub: "Spin the wheel to pick the playground arena!",
+        wheelTitle: "Where shall we play?",
+        wheelSub: "Choose a location for this round.",
         btnSpin: "Spin the Wheel!",
         lobbyTitle: "Room Lobby",
         lobbyTheme: "Chosen Theme:",
@@ -730,7 +749,7 @@
           <p><b>Hiders' Goal:</b> Stay hidden and survive until time runs out.</p>
           <p><b>Phase 1 (Hiding):</b> The seeker is blinded for 20 seconds while hiders scatter and take cover.</p>
           <p><b>How to Find:</b> Approach within 3 meters, look towards the player, and press <b>Space</b>.</p>
-          <p><b>Next Seeker:</b> The first player found becomes seeker next round (or chat vote <code>/seeker Nick</code>).</p>
+          <p><b>Next Seeker:</b> The first player found seeks next. The host can choose a seeker through their lobby card.</p>
           <p><b>Quests:</b> Completing quests awards direction hints, extra time, and bonus score.</p>
           <p><b>Controls:</b> Arrow keys (↑ ↓ ← →) or W A S D to move and steer, Space to interact, Enter for chat, Esc for pause.</p>
         `,
@@ -786,7 +805,7 @@
       }
     };
 
-    let curLang = (navigator.language && navigator.language.toLowerCase().startsWith('uk')) ? 'uk' : 'en';
+    let curLang = 'uk';
     try {
       const savedLang = localStorage.getItem('hns_lang');
       if (savedLang === 'uk' || savedLang === 'en') curLang = savedLang;
@@ -929,7 +948,11 @@
 
     // ===== UI (screens, HUD, wheel) =====
     function showScreen(screenId) {
-      ['screen-menu', 'screen-multiplayer', 'screen-wheel', 'screen-lobby', 'screen-round-end', 'modal-rules', 'modal-settings', 'modal-pause'].forEach(id => {
+      if (screenId) {
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('chat-panel').style.display = 'none';
+      }
+      ['screen-menu', 'screen-multiplayer', 'screen-wheel', 'screen-lobby', 'screen-round-end', 'modal-rules', 'modal-settings', 'modal-pause', 'modal-profile', 'modal-community', 'modal-person', 'modal-invite'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
       });
@@ -938,8 +961,18 @@
         if (el) el.style.display = 'flex';
       }
     }
-    function openModal(id) { const el = document.getElementById(id); if (el) el.style.display = 'flex'; }
-    function closeModal(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+    function openModal(id) {
+      const el = document.getElementById(id); if (!el) return;
+      if (el.style.display === 'flex') return;
+      el.returnFocus = document.activeElement;
+      const layers = [...document.querySelectorAll('[id^=modal-]')].filter(node => node.style.display === 'flex').map(node => Number(node.style.zIndex) || 130);
+      el.style.zIndex = Math.max(130, ...layers) + 1;
+      el.style.display = 'flex'; el.querySelector('input,button,select')?.focus();
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id); if (!el) return;
+      el.style.display = 'none'; el.returnFocus?.focus();
+    }
     function showToast(text) {
       const container = document.getElementById('toast-container');
       const toast = document.createElement('div');
@@ -950,103 +983,6 @@
     }
 
     // ===== NET =====
-    class NetManager {
-      constructor() {
-        this.mode = 'solo';
-        this.roomCode = '';
-        this.isHost = false;
-        this.myId = '';
-        this.channel = null;
-        this.peer = null;
-        this.connections = new Map();
-        this.onMessageCb = null;
-        this.onPeerChangeCb = null;
-      }
-      initBroadcast(roomCode, isHost, myId, onMsg, onPeerChange) {
-        this.mode = 'broadcast';
-        this.roomCode = roomCode;
-        this.isHost = isHost;
-        this.myId = myId;
-        this.onMessageCb = onMsg;
-        this.onPeerChangeCb = onPeerChange;
-        this.channel = new BroadcastChannel('hns-' + roomCode);
-        this.channel.onmessage = (evt) => {
-          const msg = evt.data;
-          if (msg && msg.sender !== this.myId && this.onMessageCb) this.onMessageCb(msg);
-        };
-      }
-      initPeerJS(roomCode, isHost, myId, onMsg, onPeerChange, onError) {
-        this.mode = 'peerjs';
-        this.roomCode = roomCode;
-        this.isHost = isHost;
-        this.myId = myId;
-        this.onMessageCb = onMsg;
-        this.onPeerChangeCb = onPeerChange;
-        if (typeof Peer === 'undefined') {
-          if (onError) onError('PeerJS offline. Use Local Test.');
-          return;
-        }
-        const peerTargetId = isHost ? ('hns-' + roomCode) : undefined;
-        try {
-          this.peer = new Peer(peerTargetId, { debug: 0 });
-        } catch(e) {
-          if (onError) onError(e.message);
-          return;
-        }
-        this.peer.on('open', (id) => {
-          this.myId = id;
-          if (!isHost) {
-            const conn = this.peer.connect('hns-' + roomCode, { reliable: true });
-            this.setupConn(conn);
-          }
-        });
-        this.peer.on('connection', (conn) => {
-          if (this.connections.size >= 10) { conn.close(); return; }
-          this.setupConn(conn);
-        });
-        this.peer.on('error', (err) => { if (onError) onError(err.message || 'Error'); });
-      }
-      setupConn(conn) {
-        conn.on('open', () => {
-          this.connections.set(conn.peer, conn);
-          if (this.onPeerChangeCb) this.onPeerChangeCb();
-        });
-        conn.on('data', (data) => {
-          if (this.onMessageCb) this.onMessageCb(data);
-          if (this.isHost && data && data.type !== 'input') {
-            this.broadcast(data.type, data.payload, conn.peer);
-          }
-        });
-        conn.on('close', () => {
-          this.connections.delete(conn.peer);
-          if (this.onPeerChangeCb) this.onPeerChangeCb();
-        });
-      }
-      send(type, payload) {
-        const msg = { type, payload, sender: this.myId, time: Date.now() };
-        if (this.mode === 'broadcast') {
-          if (this.channel) this.channel.postMessage(msg);
-        } else if (this.mode === 'peerjs') {
-          this.connections.forEach((conn) => { if (conn.open) conn.send(msg); });
-        }
-      }
-      broadcast(type, payload, excludePeerId) {
-        const msg = { type, payload, sender: this.myId, time: Date.now() };
-        if (this.mode === 'broadcast') {
-          if (this.channel) this.channel.postMessage(msg);
-        } else if (this.mode === 'peerjs') {
-          this.connections.forEach((conn, pid) => {
-            if (pid !== excludePeerId && conn.open) conn.send(msg);
-          });
-        }
-      }
-      disconnect() {
-        if (this.channel) { this.channel.close(); this.channel = null; }
-        if (this.peer) { this.peer.destroy(); this.peer = null; }
-        this.connections.clear();
-        this.mode = 'solo';
-      }
-    }
     const NET = new NetManager();
 
     // ===== WORLD (theme builders) =====
@@ -1093,6 +1029,14 @@
           ctx.beginPath(); ctx.arc(Math.random() * 128, Math.random() * 128, Math.random() * 14 + 4, 0, Math.PI * 2); ctx.fill();
         }
       });
+      const loader = new THREE.TextureLoader();
+      for (const name of ['wood', 'bark', 'stone']) {
+        TEXTURES[name].dispose();
+        const texture = loader.load('assets/' + name + '.png', undefined, undefined, () => showToast('Не вдалося завантажити текстуру ' + name));
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+        texture.encoding = THREE.sRGBEncoding; texture.anisotropy = 4;
+        TEXTURES[name] = texture;
+      }
     }
 
     let WORLD_COLLIDERS = [];
@@ -1162,6 +1106,7 @@
       for (let i = 0; i < treeCount; i++) {
         let x = (rng() - 0.5) * (CONFIG.arenaSize - 16);
         let z = (rng() - 0.5) * (CONFIG.arenaSize - 16);
+        if (x > -4 && x < 22 && z > -16 && z < -3) z -= 16;
         if (Math.abs(x - 10) < 9) x += 15;
         const s = rng() * 0.4 + 0.8;
         dummy.position.set(x, 2 * s, z); dummy.scale.set(s, s, s); dummy.updateMatrix(); trunkInst.setMatrixAt(i, dummy.matrix);
@@ -1478,7 +1423,7 @@
       const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64;
       const ctx = canvas.getContext('2d');
       const labelTex = new THREE.CanvasTexture(canvas);
-      const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, depthTest: false }));
+      const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, depthTest: true }));
       labelSprite.position.y = 1.95; labelSprite.scale.set(1.5, 0.38, 1); root.add(labelSprite);
 
       const updateLabel = (name, role) => {
@@ -1523,7 +1468,8 @@
       }
       initSpot(spot) {
         this.targetSpot = spot;
-        this.pos.set(spot.x, 0, spot.z);
+        const safe = window.HNS.checkCollisions(spot.x, spot.z);
+        this.pos.set(safe.x, 0, safe.z);
         this.mesh.position.copy(this.pos);
         this.mesh.rotation.y = Math.random() * Math.PI * 2;
         this.isFound = false;
@@ -1556,6 +1502,8 @@
         } else {
           this.meshObj.animateWalk(0, time);
         }
+        const safe = window.HNS.checkCollisions(this.pos.x, this.pos.z);
+        this.pos.set(safe.x, 0, safe.z);
         this.mesh.position.set(this.pos.x, 0, this.pos.z);
 
         this.chatCooldown -= dt;
@@ -1605,7 +1553,7 @@
         this.state = 'MENU';
         this.prevPlayingState = 'SEEKING';
         this.mode = 'solo';
-        this.myNick = storageGet('hns_nick', 'Player');
+        this.myNick = storageGet('hns_nick', '');
         this.myRole = 'seeker';
         this.quality = storageGet('hns_quality', 'med');
         this.themeId = 'forest';
@@ -1680,6 +1628,7 @@
 
         this.playerMeshObj = createCharacterMesh(getNickColor(this.myNick));
         this.playerMesh = this.playerMeshObj.root;
+        this.playerMesh.children.filter(c => c.isSprite).forEach(label => { label.visible = false; });
         this.playerMeshObj.updateLabel(this.myNick, this.myRole);
         this.scene.add(this.playerMesh);
 
@@ -1694,6 +1643,7 @@
         NET.onMessageCb = (msg) => this.handleNetMessage(msg);
         NET.onPeerChangeCb = () => this.updateLobbyUI();
 
+        this.applyQuality(this.quality);
         this.applyLanguage();
       }
 
@@ -1719,6 +1669,10 @@
 
       bindInputs() {
         window.addEventListener('keydown', (e) => {
+          if (e.defaultPrevented) return;
+          if ([...document.querySelectorAll('[id^=modal-]')].some(el => el.id !== 'modal-pause' && el.style.display === 'flex')) return;
+          if (e.target.matches('input,select,textarea') && e.target.id !== 'chat-input') return;
+          if (!['HIDING', 'SEEKING', 'PAUSED'].includes(this.state)) return;
           if (this.chatFocused) {
             if (e.key === 'Escape') { document.getElementById('chat-input').blur(); this.chatFocused = false; }
             return;
@@ -1736,6 +1690,7 @@
           if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = true;
           if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = true;
           if (e.code === 'Space') { e.preventDefault(); this.handleActionKey(); }
+          if (e.code.startsWith('Arrow')) e.preventDefault();
         });
 
         window.addEventListener('keyup', (e) => {
@@ -1771,7 +1726,7 @@
         document.getElementById('lbl-btn-local-test').textContent = t('btnLocalTest');
         document.getElementById('lbl-wheel-title').textContent = t('wheelTitle');
         document.getElementById('lbl-wheel-sub').textContent = t('wheelSub');
-        document.getElementById('lbl-btn-spin').textContent = t('btnSpin');
+
         document.getElementById('lbl-lobby-title').textContent = t('lobbyTitle');
         document.getElementById('lbl-lobby-theme').textContent = t('lobbyTheme');
         document.getElementById('lbl-btn-copy').textContent = t('btnCopy');
@@ -1823,77 +1778,20 @@
 
       startWheel(onFinished) {
         this.state = 'WHEEL'; showScreen('screen-wheel');
-        const canvas = document.getElementById('wheel-canvas');
-        const ctx = canvas.getContext('2d');
-        const btnSpin = document.getElementById('btn-spin-wheel');
-        const resText = document.getElementById('wheel-result');
-        resText.textContent = '...';
-
-        const chosenIndex = Math.floor(Math.random() * CONFIG.themes.length);
-        this.themeId = CONFIG.themes[chosenIndex].id;
-        const themes = CONFIG.themes;
-        const segAngle = (Math.PI * 2) / themes.length;
-        let curAngle = 0, spinning = false;
-
-        const drawWheel = (angle) => {
-          ctx.clearRect(0, 0, 300, 300); ctx.save(); ctx.translate(150, 150); ctx.rotate(angle);
-          for (let i = 0; i < themes.length; i++) {
-            const th = themes[i]; const startA = i * segAngle; const endA = startA + segAngle;
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 140, startA, endA);
-            ctx.fillStyle = th.color; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#D8C8AA'; ctx.stroke();
-            ctx.save(); ctx.rotate(startA + segAngle / 2); ctx.textAlign = 'right';
-            ctx.fillStyle = '#FFF9EE'; ctx.font = 'bold 14px sans-serif';
-            ctx.fillText(t('themeNames')[th.id] || th.id, 126, 5); ctx.restore();
-          }
-          ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fillStyle = '#FFF9EE'; ctx.fill();
-          ctx.lineWidth = 3; ctx.strokeStyle = '#D8C8AA'; ctx.stroke(); ctx.restore();
-        };
-
-        this.renderWheelStatic = () => drawWheel(curAngle);
-        drawWheel(0);
-
-        btnSpin.onclick = () => {
-          if (spinning) return;
-          spinning = true; btnSpin.disabled = true;
-          const targetSliceMid = (chosenIndex + 0.5) * segAngle;
-          const fullRotations = 5 * Math.PI * 2;
-          const finalAngle = fullRotations + (Math.PI * 1.5 - targetSliceMid);
-          const duration = 4800, startTime = performance.now();
-          let lastTickSlice = -1;
-
-          const animateSpin = (now) => {
-            const elapsed = now - startTime;
-            const progress = Math.min(1.0, elapsed / duration);
-            curAngle = (1 - Math.pow(1 - progress, 3)) * finalAngle;
-            drawWheel(curAngle);
-
-            const currentSlice = Math.floor((((Math.PI * 1.5 - curAngle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) / segAngle);
-            if (currentSlice !== lastTickSlice) { audio.playTick(); lastTickSlice = currentSlice; }
-
-            if (progress < 1.0) {
-              requestAnimationFrame(animateSpin);
-            } else {
-              audio.playWheelWin();
-              resText.textContent = t('themeNames')[this.themeId];
-              setTimeout(() => { btnSpin.disabled = false; if (onFinished) onFinished(this.themeId); }, 1200);
-            }
-          };
-          requestAnimationFrame(animateSpin);
-        };
+        renderLocations('location-choices', onFinished, this.themeId);
       }
 
       startSoloGame() {
-        this.mode = 'solo';
-        this.myNick = document.getElementById('input-nick').value.trim() || 'Player';
-        storageSet('hns_nick', this.myNick);
-        this.myRole = 'seeker';
-        this.startWheel((theme) => {
-          this.themeId = theme;
-          this.loadRound(theme, Math.floor(Math.random() * 999999));
-        });
+        if (!requireProfile()) return;
+        NET.disconnect(); this.mode = 'solo'; this.myNick = NET.player.name; this.myRole = 'seeker';
+        this.startWheel(theme => this.loadRound(theme, Math.floor(Math.random() * 999999)));
       }
 
       loadRound(themeId, seed) {
+        this.remotePlayers.forEach(p => disposeCharacter(p.meshObj.root)); this.remotePlayers.clear();
+        this.questScores = 0; this.hintTimer = 0; this.hintArrowMesh.visible = false; this.keys = {};
+        this.playerMeshObj.torso.material.color.set(NET.player?.color || getNickColor(this.myNick));
+        this.playerMeshObj.updateLabel(this.myNick, this.myRole);
         this.themeId = themeId; this.seed = seed; this.rng = mulberry32(seed);
         switch (themeId) {
           case 'forest': buildForest(this.scene, this.rng); break;
@@ -1903,18 +1801,26 @@
           case 'mountains': buildMountains(this.scene, this.rng); break;
         }
 
+        this.scene.traverse(obj => {
+          const mat = obj.material;
+          if (mat && [TEXTURES.wood, TEXTURES.bark, TEXTURES.stone].includes(mat.map)) {
+            mat.color.set('#ffffff'); mat.roughness = 0.9;
+            mat.bumpMap = mat.map; mat.bumpScale = mat.map === TEXTURES.bark ? 0.12 : 0.035;
+          }
+        });
         const pool = I18N[curLang].quests[themeId] || I18N['en'].quests[themeId];
         this.roundQuests = pool.slice(0, 3).map(q => ({ ...q, current: 0, completed: false, spawned: false }));
         spawnQuestItems(this.scene, this.roundQuests);
 
-        this.playerPos.set(0, 0, 0); this.playerYaw = 0; this.playerMesh.position.set(0, 0, 0);
+        this.playerPos.set(0, 0, -8); this.playerYaw = 0; this.playerMesh.position.copy(this.playerPos);
+        this.camCurrentPos.set(0, this.camHeight, -8 - this.camDistance);
         this.foundList = [];
-        this.bots.forEach(b => this.scene.remove(b.mesh));
+        this.bots.forEach(b => disposeCharacter(b.mesh));
         this.bots = [];
 
-        if (this.mode === 'solo' || (NET.isHost && document.getElementById('check-fill-bots').checked)) {
+        if (this.mode === 'solo') {
           const names = I18N[curLang].botNames;
-          const botCount = (this.mode === 'solo') ? 10 : Math.max(0, 10 - (NET.connections.size + 1));
+          const botCount = 10;
           for (let i = 0; i < botCount; i++) {
             const bot = new BotHider(i, names[i % names.length], NICK_COLORS[i % NICK_COLORS.length]);
             bot.initSpot(HIDE_SPOTS[i % HIDE_SPOTS.length]);
@@ -1924,11 +1830,13 @@
           this.totalHidersCount = botCount;
         }
 
+        if (this.mode !== 'solo') this.totalHidersCount = NET.room.players.length - 1;
         this.state = 'HIDING';
         this.hidingTimer = CONFIG.hidingDuration;
         this.seekingTimer = (this.mode === 'solo') ? CONFIG.seekingDurationSolo : CONFIG.seekingDurationMP;
         showScreen(null);
         document.getElementById('hud').style.display = 'block';
+        document.getElementById('chat-panel').style.display = 'flex';
 
         if (this.myRole === 'seeker') {
           document.getElementById('blindfold-overlay').style.display = 'flex';
@@ -1952,14 +1860,12 @@
         if (this.myRole === 'spectator') roleText = t('roleSpectator');
         document.getElementById('val-role').textContent = roleText;
 
-        const qList = document.getElementById('quest-list'); qList.innerHTML = '';
-        this.roundQuests.forEach((q) => {
-          const div = document.createElement('div');
-          div.className = `quest-item ${q.completed ? 'completed' : ''}`;
+        const qList = document.getElementById('quest-list');
+        const markup = this.roundQuests.map((q) => {
           const pct = Math.min(100, Math.round((q.current / q.target) * 100));
-          div.innerHTML = `<div class="quest-desc"><span>${q.text}</span><span>${q.current}/${q.target}</span></div><div class="quest-bar-bg"><div class="quest-bar-fill" style="width:${pct}%;"></div></div>`;
-          qList.appendChild(div);
-        });
+          return `<div class="quest-item ${q.completed ? 'completed' : ''}"><div class="quest-desc"><span>${q.text}</span><span>${q.current}/${q.target}</span></div><div class="quest-bar-bg"><div class="quest-bar-fill" style="width:${pct}%;"></div></div></div>`;
+        }).join('');
+        if (qList.innerHTML !== markup) qList.innerHTML = markup;
 
         const needle = document.getElementById('compass-needle');
         if (needle) needle.style.transform = `rotate(${-this.playerYaw}rad)`;
@@ -1973,21 +1879,21 @@
           for (const bot of this.bots) {
             if (!bot.isFound && this.playerPos.distanceTo(bot.pos) <= CONFIG.findDistance) {
               const toBot = new THREE.Vector3().subVectors(bot.pos, this.playerPos).normalize();
-              if (forward.dot(toBot) >= CONFIG.findConeCos) {
+              if (forward.dot(toBot) >= CONFIG.findConeCos && this.canSee(bot.pos)) {
                 this.findHider(bot.id, bot.name); return;
               }
             }
           }
-          this.remotePlayers.forEach((p, pid) => {
+          for (const [pid, p] of this.remotePlayers) {
             if (!p.isFound && p.role === 'hider' && this.playerPos.distanceTo(p.pos) <= CONFIG.findDistance) {
               const toP = new THREE.Vector3().subVectors(p.pos, this.playerPos).normalize();
-              if (forward.dot(toP) >= CONFIG.findConeCos) {
-                this.findHider(pid, p.name);
-                if (NET.mode !== 'solo') NET.send('found', { id: pid, name: p.name });
+              if (forward.dot(toP) >= CONFIG.findConeCos && this.canSee(p.pos)) {
+                NET.send('move', { x: this.playerPos.x, z: this.playerPos.z, yaw: this.playerYaw });
+                NET.send('find', { id: pid });
                 return;
               }
             }
-          });
+          }
         }
 
         for (const item of INTERACTABLES) {
@@ -1998,6 +1904,8 @@
       }
 
       findHider(id, name) {
+        if (this.foundList.some(p => p.id === id)) return;
+        if (id === NET.myId) this.myRole = 'spectator';
         const order = this.foundList.length + 1;
         this.foundList.push({ id, name, order, time: Date.now() });
         audio.playFind();
@@ -2011,7 +1919,7 @@
         if (remote) { remote.isFound = true; remote.meshObj.updateLabel(remote.name, 'found'); }
 
         this.updateHUD();
-        if (this.foundList.length >= this.totalHidersCount) this.endRound();
+        if (this.mode === 'solo' && this.foundList.length >= this.totalHidersCount) this.endRound();
       }
 
       interactWithQuest(item) {
@@ -2042,6 +1950,14 @@
         else if (rewardType === 'points') { this.questScores += 150; }
       }
 
+      canSee(pos) {
+        const origin = this.playerPos.clone(); origin.y = 1.2;
+        const target = pos.clone(); target.y = 1.2;
+        const direction = target.sub(origin), distance = direction.length();
+        const ray = new THREE.Raycaster(origin, direction.normalize(), 0.1, Math.max(0.1, distance - 0.3));
+        return !ray.intersectObjects(this.scene.children.filter(o => o.userData.isWorld), true).length;
+      }
+
       checkCollisions(newX, newZ, radius = 0.35) {
         const half = CONFIG.arenaSize / 2 - 1.5;
         let x = clamp(newX, -half, half); let z = clamp(newZ, -half, half);
@@ -2069,7 +1985,7 @@
       }
 
       update(dt, time) {
-        if (this.state === 'PAUSED' || this.state === 'MENU' || this.state === 'ROUND_END') return;
+        if (!['HIDING', 'SEEKING'].includes(this.state)) return;
 
         if (this.state === 'HIDING') {
           this.hidingTimer -= dt;
@@ -2084,10 +2000,10 @@
 
         if (this.state === 'SEEKING') {
           this.seekingTimer -= dt;
-          if (this.seekingTimer <= 0) this.endRound();
+          if (this.seekingTimer <= 0 && this.mode === 'solo') this.endRound();
         }
 
-        if (!this.chatFocused && (this.state === 'SEEKING' || (this.state === 'HIDING' && this.myRole !== 'seeker'))) {
+        if (this.myRole !== 'spectator' && !this.chatFocused && (this.state === 'SEEKING' || (this.state === 'HIDING' && this.myRole !== 'seeker'))) {
           if (this.keys.left) this.playerYaw += CONFIG.turnSpeed * dt;
           if (this.keys.right) this.playerYaw -= CONFIG.turnSpeed * dt;
 
@@ -2114,7 +2030,10 @@
         this.playerMeshObj.animateWalk(this.playerSpeed, time);
 
         const seekerForward = new THREE.Vector3(Math.sin(this.playerYaw), 0, Math.cos(this.playerYaw));
-        for (const bot of this.bots) bot.update(dt, time, this.playerPos, seekerForward);
+        for (const bot of this.bots) {
+          bot.update(dt, time, this.playerPos, seekerForward);
+          bot.mesh.children.filter(c => c.isSprite).forEach(label => { label.visible = bot.isFound || this.playerPos.distanceTo(bot.pos) < 5; });
+        }
 
         this.remotePlayers.forEach((rp) => {
           if (rp.targetPos) {
@@ -2157,16 +2076,9 @@
 
         if (NET.mode !== 'solo') {
           this.netSendTimer += dt;
-          if (this.netSendTimer >= (1 / CONFIG.netSnapshotRate)) {
+          if (this.netSendTimer >= 1 / CONFIG.netSnapshotRate) {
             this.netSendTimer = 0;
-            if (NET.isHost) {
-              NET.broadcast('snapshot', {
-                phase: this.state, hidingTimer: this.hidingTimer, seekingTimer: this.seekingTimer,
-                foundList: this.foundList, hostPos: { x: this.playerPos.x, z: this.playerPos.z, yaw: this.playerYaw, speed: this.playerSpeed }
-              });
-            } else {
-              NET.send('input', { x: this.playerPos.x, z: this.playerPos.z, yaw: this.playerYaw, speed: this.playerSpeed });
-            }
+            NET.send('move', { x: this.playerPos.x, z: this.playerPos.z, yaw: this.playerYaw });
           }
         }
       }
@@ -2176,9 +2088,11 @@
         const promptText = document.getElementById('prompt-text');
 
         if (this.myRole === 'seeker' && this.state === 'SEEKING') {
-          for (const bot of this.bots) {
-            if (!bot.isFound && this.playerPos.distanceTo(bot.pos) <= CONFIG.findDistance) {
-              promptText.textContent = `${t('promptFind')} ${bot.name}`;
+          const candidates = [...this.bots, ...this.remotePlayers.values()].filter(p => !p.role || p.role === 'hider');
+          const forward = new THREE.Vector3(Math.sin(this.playerYaw), 0, Math.cos(this.playerYaw));
+          for (const target of candidates) {
+            if (!target.isFound && this.playerPos.distanceTo(target.pos) <= CONFIG.findDistance && forward.dot(target.pos.clone().sub(this.playerPos).normalize()) >= CONFIG.findConeCos && this.canSee(target.pos)) {
+              promptText.textContent = `${t('promptFind')} ${target.name}`;
               promptEl.style.display = 'block'; return;
             }
           }
@@ -2198,26 +2112,17 @@
         document.getElementById('hud').style.display = 'none';
         document.getElementById('blindfold-overlay').style.display = 'none';
         showScreen('screen-round-end');
-
-        const tbody = document.getElementById('end-stats-body'); tbody.innerHTML = '';
-        let nextSeekerName = this.myNick;
-        if (this.foundList.length > 0) nextSeekerName = this.foundList[0].name;
-        document.getElementById('end-next-seeker').textContent = nextSeekerName;
-
-        const seekerPoints = this.foundList.length * 100 + Math.max(0, Math.floor(this.seekingTimer) * 2) + this.questScores;
-        const trSeeker = document.createElement('tr');
-        trSeeker.innerHTML = `<td><span class="player-tag" style="background:${getNickColor(this.myNick)};"></span>${this.myNick} (${t('roleSeeker')})</td><td>-</td><td>-</td><td><b>${seekerPoints}</b></td>`;
-        tbody.appendChild(trSeeker);
-
-        this.bots.forEach(b => {
-          const tr = document.createElement('tr');
-          const isF = b.isFound;
-          const pts = isF ? Math.max(10, Math.floor((10 - b.foundOrder) * 15)) : 150;
-          tr.innerHTML = `<td><span class="player-tag" style="background:${b.color};"></span>${b.name}</td><td>${isF ? t('statusFound') : t('statusHidden')}</td><td>${isF ? `#${b.foundOrder}` : '-'}</td><td>${pts}</td>`;
-          tbody.appendChild(tr);
-        });
-
-        if (NET.mode !== 'solo' && NET.isHost) NET.broadcast('roundEnd', { nextSeeker: nextSeekerName });
+        const participants = this.mode === 'solo'
+          ? [{ id: NET.myId, name: this.myNick, seeker: true }, ...this.bots.map(b => ({ id: b.id, name: b.name, found: b.isFound }))]
+          : NET.room.players.map(p => ({ ...p, seeker: p.id === NET.room.seekerId }));
+        document.getElementById('end-stats-body').innerHTML = participants.map(p => {
+          const order = this.foundList.findIndex(f => f.id === p.id) + 1;
+          const score = p.seeker ? this.foundList.length * 100 : p.found ? 50 : 150;
+          return '<tr><td>' + escapeHTML(p.name) + '</td><td>' + (p.seeker ? t('roleSeeker') : p.found ? t('statusFound') : t('statusHidden')) + '</td><td>' + (order || '?') + '</td><td>' + score + '</td></tr>';
+        }).join('');
+        document.getElementById('end-next-seeker').textContent = this.mode === 'solo' ? this.myNick : (this.foundList[0]?.name || participants.find(p => p.seeker)?.name || this.myNick);
+        document.getElementById('btn-next-round').hidden = this.mode !== 'solo' && !NET.isHost;
+        document.getElementById('btn-end-wheel').hidden = this.mode !== 'solo' && !NET.isHost;
       }
 
       addChatMessage(sender, text, color = '#2B2620', isSystem = false) {
@@ -2225,129 +2130,37 @@
       }
 
       sendChat() {
-        const input = document.getElementById('chat-input');
-        const text = input.value.trim();
-        if (!text) return;
-        input.value = '';
-
-        if (text.startsWith('/')) { this.handleCommand(text); return; }
-
-        this.addChatMessage(this.myNick, text, getNickColor(this.myNick));
-        if (NET.mode !== 'solo') NET.send('chat', { sender: this.myNick, text, color: getNickColor(this.myNick) });
+        const input = document.getElementById('chat-input'), text = input.value.trim();
+        if (!text) return; input.value = '';
+        if (text.startsWith('/')) { this.addChatMessage('Підказка', 'Шукач обирається через картку гравця в лобі. W/S — рух, A/D — поворот, Пробіл — знайти.', '#356846', true); return; }
+        if (NET.mode !== 'solo') NET.send('chat', { text });
+        else this.addChatMessage(this.myNick, text, getNickColor(this.myNick));
       }
 
-      handleCommand(cmd) {
-        const parts = cmd.split(' ');
-        const action = parts[0].toLowerCase();
-        if (action === '/help') {
-          const div = document.createElement('div');
-          div.className = 'chat-msg help'; div.textContent = t('chatHelp');
-          document.getElementById('chat-messages').appendChild(div); return;
-        }
-        if (action === '/seeker' && parts[1]) {
-          const candidate = parts[1];
-          this.activeProposal = { type: 'seeker', target: candidate, yes: 1, no: 0, voters: new Set([this.myNick]) };
-          this.addChatMessage('System', `Голосування: призначити ${candidate} шукачем? Пишіть /yes або /no`, '#D9822B', true);
-          if (this.proposalTimeout) clearTimeout(this.proposalTimeout);
-          this.proposalTimeout = setTimeout(() => {
-            if (this.activeProposal) {
-              const passed = this.activeProposal.yes > this.activeProposal.no;
-              this.addChatMessage('System', `Голосування завершено! Результат: ${passed ? 'ПРИЙНЯТО' : 'ВІДХИЛЕНО'}`, '#756A5B', true);
-              if (passed && candidate === this.myNick) {
-                this.myRole = 'seeker'; this.playerMeshObj.updateLabel(this.myNick, 'seeker');
-              }
-              this.activeProposal = null;
-            }
-          }, 20000);
-          return;
-        }
-        if (action === '/yes' || action === '/no') {
-          if (!this.activeProposal) { this.addChatMessage('System', 'Наразі немає активного голосування.', '#756A5B', true); return; }
-          if (this.activeProposal.voters.has(this.myNick)) { this.addChatMessage('System', 'Ви вже проголосували!', '#756A5B', true); return; }
-          this.activeProposal.voters.add(this.myNick);
-          if (action === '/yes') this.activeProposal.yes++; else this.activeProposal.no++;
-          this.addChatMessage('System', `Голос зараховано! За: ${this.activeProposal.yes}, Проти: ${this.activeProposal.no}`, '#756A5B', true);
-          return;
-        }
-        this.addChatMessage('System', 'Невідома команда. Введіть /help', '#756A5B', true);
-      }
+      handleCommand() { showToast('Обери шукача через картку в лобі.'); }
 
-      createRoom(isLocal = false) {
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let code = '';
-        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-        this.myNick = document.getElementById('input-nick').value.trim() || 'Host';
-        storageSet('hns_nick', this.myNick);
+      createRoom() { if (requireProfile()) NET.send('create'); }
 
-        if (isLocal) {
-          NET.initBroadcast(code, true, this.myNick, (m) => this.handleNetMessage(m), () => this.updateLobbyUI());
-        } else {
-          NET.initPeerJS(code, true, this.myNick, (m) => this.handleNetMessage(m), () => this.updateLobbyUI(), (err) => showToast(`PeerJS: ${err}`));
-        }
+      joinRoom(code) { if (requireProfile()) NET.send('join', { code }); }
 
-        document.getElementById('lobby-code-badge').textContent = code;
-        this.startWheel((theme) => {
-          this.themeId = theme;
-          document.getElementById('lobby-theme-name').textContent = t('themeNames')[theme];
-          showScreen('screen-lobby');
-          this.updateLobbyUI();
-        });
-      }
-
-      joinRoom(code) {
-        this.myNick = document.getElementById('input-nick').value.trim() || 'Player';
-        storageSet('hns_nick', this.myNick);
-        code = code.toUpperCase().trim();
-        NET.initBroadcast(code, false, this.myNick, (m) => this.handleNetMessage(m), () => this.updateLobbyUI());
-        document.getElementById('lobby-code-badge').textContent = code;
-        showScreen('screen-lobby');
-        this.updateLobbyUI();
-      }
-
-      updateLobbyUI() {
-        const countSpan = document.getElementById('lobby-player-count');
-        const listDiv = document.getElementById('lobby-player-list');
-        listDiv.innerHTML = '';
-        const myTag = document.createElement('div');
-        myTag.style.display = 'flex'; myTag.style.alignItems = 'center'; myTag.style.gap = '6px';
-        myTag.innerHTML = `<span class="player-tag" style="background:${getNickColor(this.myNick)};"></span><b>${this.myNick}</b> (${NET.isHost ? 'Host' : 'You'})`;
-        listDiv.appendChild(myTag);
-
-        NET.connections.forEach((conn, pid) => {
-          const div = document.createElement('div');
-          div.style.display = 'flex'; div.style.alignItems = 'center'; div.style.gap = '6px';
-          div.innerHTML = `<span class="player-tag" style="background:${getNickColor(pid)};"></span>${pid}`;
-          listDiv.appendChild(div);
-        });
-        countSpan.textContent = NET.connections.size + 1;
-      }
+      updateLobbyUI() { if (NET.room) syncRoom(NET.room); }
 
       startMultiplayerRound() {
         if (!NET.isHost) return;
-        const seed = Math.floor(Math.random() * 999999);
-        NET.broadcast('start', { theme: this.themeId, seed });
-        this.loadRound(this.themeId, seed);
+        if (NET.room.players.length === 1) {
+          const theme = NET.room.theme; NET.disconnect(); this.mode = 'solo'; this.myRole = 'seeker';
+          this.loadRound(theme, Math.floor(Math.random() * 999999));
+        } else NET.send('start');
       }
 
       leaveLobby() {
-        NET.disconnect();
+        NET.disconnect(); this.state = 'MENU'; this.keys = {};
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('blindfold-overlay').style.display = 'none';
         showScreen('screen-menu');
       }
 
-      handleNetMessage(msg) {
-        if (!msg) return;
-        if (msg.type === 'chat') this.addChatMessage(msg.payload.sender, msg.payload.text, msg.payload.color);
-        else if (msg.type === 'found') this.findHider(msg.payload.id, msg.payload.name);
-        else if (msg.type === 'start') this.loadRound(msg.payload.theme, msg.payload.seed);
-        else if (msg.type === 'snapshot' && !NET.isHost) {
-          this.hidingTimer = msg.payload.hidingTimer;
-          this.seekingTimer = msg.payload.seekingTimer;
-          this.foundList = msg.payload.foundList || [];
-          this.updateHUD();
-        } else if (msg.type === 'roundEnd') {
-          this.endRound();
-        }
-      }
+      handleNetMessage(msg) { if (msg?.type === 'room') syncRoom(msg); }
     }
 
     // ===== RENDER LOOP =====
@@ -2358,14 +2171,19 @@
       lastTime = now;
       if (window.HNS) {
         window.HNS.update(dt, now * 0.001);
-        window.HNS.renderer.render(window.HNS.scene, window.HNS.camera);
+        if (['HIDING', 'SEEKING', 'PAUSED'].includes(window.HNS.state)) window.HNS.renderer.render(window.HNS.scene, window.HNS.camera);
       }
     }
 
     // ===== INIT =====
     window.addEventListener('DOMContentLoaded', () => {
-      window.HNS = new HideAndSeekGame();
-      window.HNS.init();
+      try {
+        window.HNS = new HideAndSeekGame();
+        window.HNS.init();
+      } catch (error) {
+        document.getElementById('connection-state').textContent = 'Потрібен браузер із WebGL. Увімкніть апаратне прискорення.';
+        console.error(error); return;
+      }
 
       document.getElementById('btn-lang-toggle').onclick = () => window.HNS.toggleLanguage();
       document.getElementById('btn-set-lang-toggle').onclick = () => window.HNS.toggleLanguage();
@@ -2423,6 +2241,7 @@
         showScreen('screen-multiplayer');
       }
 
+      setupCommunity();
       requestAnimationFrame(loop);
     });
   </script>
