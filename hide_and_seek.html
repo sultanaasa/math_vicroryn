@@ -1,0 +1,2431 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hide & Seek / Хованки 3D</title>
+  <!-- Three.js r128 & PeerJS 1.5.4 (pinned versions) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    /* ===== RESET & FLAT WARM DESIGN SYSTEM ===== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    :root {
+      --bg: #F4EBDD;
+      --panel: #FFF9EE;
+      --panel-header: #EFE6D5;
+      --border: #D8C8AA;
+      --text: #2B2620;
+      --text-muted: #756A5B;
+      --accent: #D9822B;
+      --accent-hover: #C27222;
+      --secondary: #5B8C5A;
+      --secondary-hover: #4E7A4D;
+      --danger: #C8523A;
+      --blue: #4FA3C7;
+      --shadow: 0 4px 12px rgba(43, 38, 32, 0.08);
+      --radius: 10px;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #game-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+    button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 10px 18px;
+      background: var(--accent);
+      color: #FFF9EE;
+      border: 2px solid var(--accent);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+    button:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+    button.secondary { background: var(--secondary); border-color: var(--secondary); }
+    button.secondary:hover { background: var(--secondary-hover); border-color: var(--secondary-hover); }
+    button.outline { background: transparent; color: var(--text); border: 2px solid var(--border); }
+    button.outline:hover { background: var(--panel-header); border-color: var(--text-muted); }
+    button.danger { background: var(--danger); border-color: var(--danger); }
+    button.small { min-height: 32px; padding: 4px 10px; font-size: 12px; }
+    input[type="text"] {
+      height: 44px;
+      padding: 8px 14px;
+      background: #FFFFFF;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    input[type="text"]:focus { border-color: var(--accent); outline: none; }
+    .screen-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(43, 38, 32, 0.45);
+    }
+    .modal-card {
+      width: 90%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .modal-title {
+      font-size: 21px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-subtitle { font-size: 13px; color: var(--text-muted); }
+    .btn-stack { display: flex; flex-direction: column; gap: 10px; }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row > * { flex: 1; }
+
+    /* ===== HUD ===== */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: none;
+    }
+    .hud-element {
+      pointer-events: auto;
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    #hud-top {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 8px 18px;
+    }
+    .hud-stat { display: flex; flex-direction: column; align-items: center; }
+    .hud-stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+    .hud-stat-val { font-size: 20px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+    #compass-container {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--panel-header);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #compass-needle { width: 4px; height: 24px; background: var(--danger); border-radius: 2px; }
+
+    #hud-quests {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      width: 260px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .quest-title { font-weight: 700; font-size: 13px; color: var(--secondary); display: flex; align-items: center; gap: 6px; }
+    .quest-item {
+      display: flex; flex-direction: column; gap: 3px; font-size: 12px;
+      padding: 6px 8px; background: #FFFDF8; border: 1px solid var(--border); border-radius: 6px;
+    }
+    .quest-item.completed { border-color: var(--secondary); background: #F1F8EE; }
+    .quest-desc { display: flex; justify-content: space-between; font-weight: 600; }
+    .quest-bar-bg { width: 100%; height: 5px; background: #E8DCC8; border-radius: 3px; overflow: hidden; }
+    .quest-bar-fill { height: 100%; background: var(--secondary); width: 0%; transition: width 0.3s ease; }
+
+    #hud-prompt {
+      position: absolute;
+      bottom: 22%;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      display: none;
+    }
+    .key-badge {
+      display: inline-block; padding: 2px 7px; background: var(--text); color: #FFF;
+      border-radius: 4px; font-size: 12px; margin-right: 6px;
+    }
+
+    #blindfold-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50;
+      background: #2B2620; color: #FFF9EE; display: none; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 20px;
+    }
+    #blindfold-title { font-size: 26px; font-weight: 800; color: var(--accent); }
+    #blindfold-countdown { font-size: 72px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    #blindfold-desc { font-size: 15px; max-width: 440px; color: #D8C8AA; }
+
+    #toast-container {
+      position: absolute; top: 76px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; gap: 6px; z-index: 80; pointer-events: none;
+    }
+    .toast {
+      padding: 8px 16px; background: var(--panel); border: 2px solid var(--secondary);
+      border-radius: var(--radius); color: var(--text); font-weight: 700; box-shadow: var(--shadow); font-size: 13px;
+    }
+
+    /* ===== CHAT PANEL ===== */
+    #chat-panel {
+      position: absolute; bottom: 14px; right: 14px; width: 280px; height: 360px;
+      display: flex; flex-direction: column; z-index: 20; background: var(--panel);
+      border: 2px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); pointer-events: auto;
+    }
+    #chat-header {
+      padding: 8px 12px; background: var(--panel-header); border-bottom: 1px solid var(--border);
+      font-size: 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
+      border-radius: 8px 8px 0 0;
+    }
+    #chat-messages {
+      flex: 1; overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column;
+      gap: 5px; font-size: 12px; user-select: text; -webkit-user-select: text;
+    }
+    .chat-msg { word-break: break-word; line-height: 1.3; }
+    .chat-msg.system { font-style: italic; color: var(--text-muted); font-size: 11px; }
+    .chat-msg.help { background: #F2EADB; padding: 4px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; }
+    .chat-sender { font-weight: 700; margin-right: 4px; }
+    #chat-form { display: flex; padding: 6px 8px; gap: 6px; border-top: 1px solid var(--border); }
+    #chat-input { flex: 1; height: 32px; font-size: 12px; padding: 4px 8px; }
+    #chat-send-btn { min-height: 32px; padding: 0 10px; font-size: 12px; }
+
+    /* ===== WHEEL ===== */
+    #wheel-container { position: relative; width: 300px; height: 300px; margin: 8px auto; }
+    #wheel-canvas { width: 300px; height: 300px; border-radius: 50%; border: 4px solid var(--border); box-shadow: var(--shadow); background: #FFF; }
+    #wheel-pointer {
+      position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0;
+      border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 22px solid var(--accent); z-index: 10;
+    }
+    #wheel-result { font-size: 17px; font-weight: 800; text-align: center; min-height: 24px; color: var(--accent); }
+
+    .icon { width: 16px; height: 16px; fill: currentColor; display: inline-block; vertical-align: middle; }
+    .stats-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .stats-table th, .stats-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+    .stats-table th { font-weight: 700; color: var(--text-muted); }
+    .player-tag { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  </style>
+</head>
+<body>
+
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div id="hud-top" class="hud-element">
+      <div class="hud-stat">
+        <span class="hud-stat-label" id="lbl-timer">Час</span>
+        <span class="hud-stat-val" id="val-timer">05:00</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-stat-label" id="lbl-found">Знайдено</span>
+        <span class="hud-stat-val" id="val-found">0 / 10</span>
+      </div>
+      <div class="hud-stat">
+        <span class="hud-stat-label" id="lbl-role">Роль</span>
+        <span class="hud-stat-val" id="val-role" style="font-size:15px;">Шукач</span>
+      </div>
+      <div id="compass-container">
+        <div id="compass-needle"></div>
+      </div>
+      <button class="small outline" id="btn-pause">Esc</button>
+    </div>
+
+    <div id="hud-quests" class="hud-element">
+      <div class="quest-title">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 4.5l7.5 13H4.5L12 6.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+        <span id="lbl-quests-title">Завдання раунду</span>
+      </div>
+      <div id="quest-list"></div>
+    </div>
+
+    <div id="hud-prompt" class="hud-element">
+      <span class="key-badge">Space</span>
+      <span id="prompt-text">Знайти гравця!</span>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <div id="blindfold-overlay">
+    <div id="blindfold-title">ХОВАНКИ!</div>
+    <div id="blindfold-countdown">20</div>
+    <div id="blindfold-desc">Шукач рахує до 20 з заплющеними очима. Інші гравці ховаються!</div>
+  </div>
+
+  <div id="chat-panel">
+    <div id="chat-header">
+      <span id="lbl-chat-header">Чат раунду</span>
+      <span style="font-size:10px; color:var(--text-muted);">Enter: писати</span>
+    </div>
+    <div id="chat-messages"></div>
+    <form id="chat-form" onsubmit="event.preventDefault(); window.HNS.sendChat();">
+      <input type="text" id="chat-input" maxlength="140" placeholder="Повідомлення..." autocomplete="off">
+      <button type="submit" id="chat-send-btn" class="secondary">OK</button>
+    </form>
+  </div>
+
+  <!-- SCREEN: MENU -->
+  <div class="screen-overlay" id="screen-menu">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span>Хованки / Hide & Seek 3D</span>
+        <button class="small outline" id="btn-lang-toggle">UA | EN</button>
+      </div>
+      <div class="modal-subtitle" id="lbl-menu-sub">Затишна тривимірна гра в хованки у 5 унікальних локаціях</div>
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <label for="input-nick" style="font-weight:700; font-size:12px; color:var(--text-muted);" id="lbl-nickname">Ваш нікнейм:</label>
+        <input type="text" id="input-nick" maxlength="14" value="Гравець">
+      </div>
+      <div class="btn-stack">
+        <button id="btn-play-solo" class="secondary">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          <span id="lbl-btn-solo">Грати соло (Шукач проти 10 ботів)</span>
+        </button>
+        <button id="btn-play-friends">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          <span id="lbl-btn-friends">Грати з друзями (Онлайн)</span>
+        </button>
+        <div class="btn-row">
+          <button class="outline" id="btn-rules"><span id="lbl-btn-rules">Правила гри</span></button>
+          <button class="outline" id="btn-settings"><span id="lbl-btn-settings">Налаштування</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: MULTIPLAYER -->
+  <div class="screen-overlay" id="screen-multiplayer" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span id="lbl-mp-title">Мережева гра</span>
+        <button class="small outline" onclick="window.HNS.showScreen('screen-menu');">&times;</button>
+      </div>
+      <div class="modal-subtitle" id="lbl-mp-sub">Оберіть режим створення кімнати або підключення за кодом</div>
+      <div class="btn-stack">
+        <button id="btn-mp-create" class="secondary"><span id="lbl-btn-create-room">Створити кімнату (Host)</span></button>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="input-room-code" placeholder="Код кімнати (ABCD23)" maxlength="6" style="text-transform:uppercase; flex:1;">
+          <button id="btn-mp-join" class="outline"><span id="lbl-btn-join">Приєднатися</span></button>
+        </div>
+        <hr style="border:0; border-top:1px solid var(--border);">
+        <button id="btn-mp-local" class="outline"><span id="lbl-btn-local-test">Локальний тест (Вкладки)</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: WHEEL -->
+  <div class="screen-overlay" id="screen-wheel" style="display:none;">
+    <div class="modal-card" style="text-align:center;">
+      <div class="modal-title" style="justify-content:center;"><span id="lbl-wheel-title">Колесо локацій</span></div>
+      <div class="modal-subtitle" id="lbl-wheel-sub">Крутіть колесо, щоб визначити місце гри!</div>
+      <div id="wheel-container">
+        <div id="wheel-pointer"></div>
+        <canvas id="wheel-canvas" width="300" height="300"></canvas>
+      </div>
+      <div id="wheel-result">...</div>
+      <div class="btn-stack">
+        <button id="btn-spin-wheel" class="secondary"><span id="lbl-btn-spin">Крутити колесо!</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: LOBBY -->
+  <div class="screen-overlay" id="screen-lobby" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span id="lbl-lobby-title">Лобі кімнати</span>
+        <span id="lobby-code-badge" style="background:var(--panel-header); padding:3px 8px; border-radius:6px; font-family:monospace; font-size:15px;">------</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; background:#FFFDF8; padding:8px 10px; border:1px solid var(--border); border-radius:6px;">
+        <div>
+          <div style="font-size:11px; color:var(--text-muted);" id="lbl-lobby-theme">Обрана тема:</div>
+          <div style="font-weight:700; font-size:14px; color:var(--accent);" id="lobby-theme-name">Ліс</div>
+        </div>
+        <button class="small outline" id="btn-copy-link"><span id="lbl-btn-copy">Скопіювати лінк</span></button>
+      </div>
+      <div>
+        <div style="font-weight:700; font-size:12px; margin-bottom:4px; color:var(--text-muted);" id="lbl-lobby-players">Гравці (<span id="lobby-player-count">1</span>/10):</div>
+        <div id="lobby-player-list" style="display:flex; flex-direction:column; gap:4px; max-height:140px; overflow-y:auto;"></div>
+      </div>
+      <div id="lobby-host-controls" style="display:flex; flex-direction:column; gap:8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" id="check-fill-bots" checked>
+          <span id="lbl-fill-bots">Заповнити ботами до 10</span>
+        </label>
+        <button id="btn-lobby-start" class="secondary"><span id="lbl-btn-start">Почати гру!</span></button>
+      </div>
+      <button class="outline" onclick="window.HNS.leaveLobby();" id="lbl-btn-leave-lobby">Вийти в меню</button>
+    </div>
+  </div>
+
+  <!-- SCREEN: ROUND END -->
+  <div class="screen-overlay" id="screen-round-end" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title"><span id="lbl-end-title">Раунд завершено!</span></div>
+      <div class="modal-subtitle" id="lbl-end-sub">Результати пошуку та набрані бали:</div>
+      <div style="max-height:200px; overflow-y:auto;">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th id="th-player">Гравець</th>
+              <th id="th-status">Статус</th>
+              <th id="th-order">Черга</th>
+              <th id="th-score">Бали</th>
+            </tr>
+          </thead>
+          <tbody id="end-stats-body"></tbody>
+        </table>
+      </div>
+      <div style="background:#FFFDF8; padding:8px 10px; border:1px solid var(--border); border-radius:6px;">
+        <div style="font-size:11px; color:var(--text-muted);" id="lbl-next-seeker-title">Наступний шукач:</div>
+        <div style="font-weight:800; font-size:15px; color:var(--accent);" id="end-next-seeker">...</div>
+      </div>
+      <div class="btn-stack">
+        <button id="btn-next-round" class="secondary"><span id="lbl-btn-next-round">Наступний раунд</span></button>
+        <button id="btn-end-wheel" class="outline"><span id="lbl-btn-new-theme">Крутити колесо знову</span></button>
+        <button class="outline" onclick="window.HNS.showScreen('screen-menu');"><span id="lbl-btn-end-menu">Головне меню</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: RULES -->
+  <div class="screen-overlay" id="modal-rules" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span id="lbl-rules-title">Правила гри</span>
+        <button class="small outline" onclick="window.HNS.closeModal('modal-rules');">&times;</button>
+      </div>
+      <div id="rules-content" style="font-size:13px; line-height:1.5; display:flex; flex-direction:column; gap:8px;"></div>
+      <button class="secondary" onclick="window.HNS.closeModal('modal-rules');" id="lbl-rules-close">Зрозуміло</button>
+    </div>
+  </div>
+
+  <!-- MODAL: SETTINGS -->
+  <div class="screen-overlay" id="modal-settings" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span id="lbl-settings-title">Налаштування</span>
+        <button class="small outline" onclick="window.HNS.closeModal('modal-settings');">&times;</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span id="lbl-set-lang">Мова (Language):</span>
+          <button class="small outline" id="btn-set-lang-toggle">Українська</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span id="lbl-set-quality">Якість графіки:</span>
+          <div style="display:flex; gap:4px;">
+            <button class="small outline q-btn" data-q="low">Низ</button>
+            <button class="small outline q-btn" data-q="med">Сер</button>
+            <button class="small outline q-btn" data-q="high">Вис</button>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span id="lbl-set-sound">Звукові ефекти:</span>
+          <button class="small outline" id="btn-set-sound-toggle">Увімкнено</button>
+        </div>
+      </div>
+      <button class="secondary" onclick="window.HNS.closeModal('modal-settings');" id="lbl-settings-save">Готово</button>
+    </div>
+  </div>
+
+  <!-- MODAL: PAUSE -->
+  <div class="screen-overlay" id="modal-pause" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-title"><span id="lbl-pause-title">Пауза</span></div>
+      <div class="btn-stack">
+        <button class="secondary" id="btn-pause-resume"><span id="lbl-pause-resume">Продовжити</span></button>
+        <button class="outline" id="btn-pause-rules"><span id="lbl-pause-rules">Правила</span></button>
+        <button class="outline" id="btn-pause-settings"><span id="lbl-pause-settings">Налаштування</span></button>
+        <button class="danger" id="btn-pause-leave"><span id="lbl-pause-leave">Вийти в меню</span></button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== CONFIG =====
+    const CONFIG = {
+      walkSpeed: 3.2,
+      runSpeed: 4.8,
+      turnSpeed: 2.8,
+      hidingDuration: 20,
+      seekingDurationSolo: 300,
+      seekingDurationMP: 240,
+      findDistance: 3.0,
+      findConeCos: Math.cos(60 * Math.PI / 180),
+      arenaSize: 120,
+      netSnapshotRate: 20,
+      chatRateLimit: 500,
+      chatMaxMessages: 40,
+      themes: [
+        { id: 'forest', color: '#5B8C5A' },
+        { id: 'school', color: '#D9A441' },
+        { id: 'aquapark', color: '#4FA3C7' },
+        { id: 'playground', color: '#E07A5F' },
+        { id: 'mountains', color: '#8C8C99' }
+      ]
+    };
+
+    // ===== I18N =====
+    const I18N = {
+      uk: {
+        gameTitle: "Хованки 3D",
+        subtitle: "Затишна тривимірна гра в хованки у 5 унікальних локаціях",
+        nickname: "Ваш нікнейм:",
+        btnSolo: "Грати соло (Шукач проти 10 ботів)",
+        btnFriends: "Грати з друзями (Онлайн)",
+        btnRules: "Правила гри",
+        btnSettings: "Налаштування",
+        mpTitle: "Мережева гра",
+        mpSub: "Оберіть режим створення кімнати або підключення за кодом",
+        btnCreateRoom: "Створити кімнату (Host)",
+        btnJoin: "Приєднатися",
+        btnLocalTest: "Локальний тест (Вкладки)",
+        wheelTitle: "Колесо локацій",
+        wheelSub: "Крутіть колесо, щоб визначити місце гри!",
+        btnSpin: "Крутити колесо!",
+        lobbyTitle: "Лобі кімнати",
+        lobbyTheme: "Обрана тема:",
+        btnCopy: "Скопіювати лінк",
+        copiedToast: "Посилання скопійовано!",
+        lobbyPlayers: "Гравці:",
+        fillBots: "Заповнити ботами до 10",
+        btnStart: "Почати гру!",
+        btnLeaveLobby: "Вийти в меню",
+        lblTimer: "Час",
+        lblFound: "Знайдено",
+        lblRole: "Роль",
+        roleSeeker: "Шукач",
+        roleHider: "Ховається",
+        roleSpectator: "Глядач",
+        questsTitle: "Завдання раунду",
+        promptFind: "Знайти гравця!",
+        promptInteract: "Взаємодіяти",
+        chatHeader: "Чат раунду",
+        chatPlaceholder: "Повідомлення...",
+        blindfoldTitle: "ХОВАНКИ!",
+        blindfoldDesc: "Шукач рахує до 20 з заплющеними очима. Інші гравці ховаються!",
+        endTitle: "Раунд завершено!",
+        endSub: "Результати пошуку та набрані бали:",
+        thPlayer: "Гравець",
+        thStatus: "Статус",
+        thOrder: "Черга",
+        thScore: "Бали",
+        statusFound: "Знайдено",
+        statusHidden: "Не знайдено!",
+        nextSeekerTitle: "Наступний шукач:",
+        btnNextRound: "Наступний раунд",
+        btnNewTheme: "Крутити колесо знову",
+        btnEndMenu: "Головне меню",
+        rulesTitle: "Правила гри",
+        rulesClose: "Зрозуміло",
+        settingsTitle: "Налаштування",
+        settingsSave: "Готово",
+        setLang: "Мова:",
+        setQuality: "Якість графіки:",
+        setSound: "Звукові ефекти:",
+        pauseTitle: "Пауза",
+        pauseResume: "Продовжити",
+        pauseRules: "Правила",
+        pauseSettings: "Налаштування",
+        pauseLeave: "Вийти в меню",
+        soundOn: "Увімкнено",
+        soundOff: "Вимкнено",
+        themeNames: {
+          forest: "Ліс",
+          school: "Школа",
+          aquapark: "Аквапарк",
+          playground: "Парк з майданчиками",
+          mountains: "Гори"
+        },
+        rulesContent: `
+          <p><b>Мета шукача:</b> знайти всіх гравців, що сховалися, до завершення таймера.</p>
+          <p><b>Мета тих, хто ховається:</b> залишатися непоміченими якомога довше.</p>
+          <p><b>Початок раунду:</b> шукач заплющує очі й рахує 20 секунд. За цей час гравці ховаються на локації.</p>
+          <p><b>Як знайти:</b> підійдіть до гравця ближче ніж на 3 метри, подивіться на нього та натисніть <b>Пробіл</b>.</p>
+          <p><b>Наступний шукач:</b> гравець, якого знайшли першим, шукає наступним (або голосування в чаті <code>/seeker Nick</code>).</p>
+          <p><b>Завдання:</b> виконання завдань дає підказки, додатковий час та бонусні бали.</p>
+          <p><b>Керування:</b> стрілочки (↑ ↓ ← →) або W A S D — рух і поворот, Space — дія, Enter — чат, Esc — меню.</p>
+        `,
+        chatHelp: "Команди чату: /seeker <нік> — запропонувати шукача; /hiders <нік1,нік2> — запропонувати тих, хто ховається; /yes, /no — голос; /help — довідка.",
+        botLines: [
+          "Я сховався, спробуй знайди!",
+          "Тут так затишно...",
+          "Хтось ходить поруч...",
+          "Мене ніхто не помітить!",
+          "Ой, ти мене знайшов!",
+          "Тут чудовий сховок!"
+        ],
+        botNames: ["Богдан", "Софія", "Тарас", "Оленка", "Максим", "Дарина", "Юрко", "Катруся", "Андрій", "Марічка"],
+        quests: {
+          forest: [
+            { id: "f1", text: "Зібрати 6 жолудів", target: 6, reward: "hint", actionText: "Підібрати жолудь" },
+            { id: "f2", text: "Знайти 3 гриби", target: 3, reward: "time", actionText: "Зірвати гриб" },
+            { id: "f3", text: "Подзвонити в дзвоник на мосту", target: 1, reward: "speed", actionText: "Подзвонити в дзвоник" },
+            { id: "f4", text: "Наповнити годівничку для білок", target: 1, reward: "points", actionText: "Покласти горішки" }
+          ],
+          school: [
+            { id: "s1", text: "Знайти 4 загублені ключі", target: 4, reward: "hint", actionText: "Підібрати ключ" },
+            { id: "s2", text: "Подзвонити у шкільний дзвінок", target: 1, reward: "time", actionText: "Увімкнути дзвінок" },
+            { id: "s3", text: "Повернути 5 книжок на полиці", target: 5, reward: "speed", actionText: "Поставити книгу" },
+            { id: "s4", text: "Полити 3 вазони в атріумі", target: 3, reward: "points", actionText: "Полити вазон" }
+          ],
+          aquapark: [
+            { id: "a1", text: "Зібрати 6 пляжних м'ячів", target: 6, reward: "hint", actionText: "Взяти м'яч" },
+            { id: "a2", text: "Знайти 3 рушники", target: 3, reward: "time", actionText: "Підібрати рушник" },
+            { id: "a3", text: "Запустити хвильову установку", target: 1, reward: "speed", actionText: "Натиснути кнопку хвилі" },
+            { id: "a4", text: "Знайти свисток рятувальника", target: 1, reward: "points", actionText: "Взяти свисток" }
+          ],
+          playground: [
+            { id: "p1", text: "Зібрати 5 повітряних кульок", target: 5, reward: "hint", actionText: "Зловити кульку" },
+            { id: "p2", text: "Розкрутити карусель", target: 1, reward: "speed", actionText: "Штовхнути карусель" },
+            { id: "p3", text: "Розгойдати 3 гойдалки", target: 3, reward: "time", actionText: "Штовхнути гойдалку" },
+            { id: "p4", text: "Знайти 3 загублені іграшки", target: 3, reward: "points", actionText: "Підібрати іграшку" }
+          ],
+          mountains: [
+            { id: "m1", text: "Знайти 4 кристали у печерах", target: 4, reward: "hint", actionText: "Взяти кристал" },
+            { id: "m2", text: "Погодувати гірську кізку (сіно)", target: 1, reward: "speed", actionText: "Дати сіно" },
+            { id: "m3", text: "Знайти 3 квітки едельвейсу", target: 3, reward: "time", actionText: "Зірвати едельвейс" },
+            { id: "m4", text: "Сфотографувати кажана (Space)", target: 1, reward: "points", actionText: "Сфотографувати" }
+          ]
+        },
+        toastQuestDone: "Завдання виконано! Нагорода: ",
+        rewards: {
+          hint: "Підказка напрямку до гравця!",
+          time: "+20 секунд часу!",
+          speed: "+15% швидкості бігу!",
+          points: "+150 бонусних балів!"
+        }
+      },
+      en: {
+        gameTitle: "Hide & Seek 3D",
+        subtitle: "A cozy 3D hide-and-seek game in 5 unique sunny settings",
+        nickname: "Your Nickname:",
+        btnSolo: "Play Solo (Seeker vs 10 Bots)",
+        btnFriends: "Play with Friends (Online)",
+        btnRules: "Game Rules",
+        btnSettings: "Settings",
+        mpTitle: "Multiplayer",
+        mpSub: "Choose to create a new room or join with a room code",
+        btnCreateRoom: "Create Room (Host)",
+        btnJoin: "Join Room",
+        btnLocalTest: "Local Test (Tabs)",
+        wheelTitle: "Theme Wheel",
+        wheelSub: "Spin the wheel to pick the playground arena!",
+        btnSpin: "Spin the Wheel!",
+        lobbyTitle: "Room Lobby",
+        lobbyTheme: "Chosen Theme:",
+        btnCopy: "Copy Invite Link",
+        copiedToast: "Link copied to clipboard!",
+        lobbyPlayers: "Players:",
+        fillBots: "Fill with bots up to 10",
+        btnStart: "Start Game!",
+        btnLeaveLobby: "Back to Menu",
+        lblTimer: "Time",
+        lblFound: "Found",
+        lblRole: "Role",
+        roleSeeker: "Seeker",
+        roleHider: "Hider",
+        roleSpectator: "Spectator",
+        questsTitle: "Round Quests",
+        promptFind: "Find Player!",
+        promptInteract: "Interact",
+        chatHeader: "Round Chat",
+        chatPlaceholder: "Message...",
+        blindfoldTitle: "HIDING TIME!",
+        blindfoldDesc: "The seeker counts to 20 with eyes covered. Hiders run and find cover!",
+        endTitle: "Round Finished!",
+        endSub: "Search results and scoring breakdown:",
+        thPlayer: "Player",
+        thStatus: "Status",
+        thOrder: "Order",
+        thScore: "Score",
+        statusFound: "Found",
+        statusHidden: "Not Found!",
+        nextSeekerTitle: "Next Seeker:",
+        btnNextRound: "Next Round",
+        btnNewTheme: "Spin Wheel Again",
+        btnEndMenu: "Main Menu",
+        rulesTitle: "Game Rules",
+        rulesClose: "Got It",
+        settingsTitle: "Settings",
+        settingsSave: "Done",
+        setLang: "Language:",
+        setQuality: "Graphics Quality:",
+        setSound: "Sound Effects:",
+        pauseTitle: "Paused",
+        pauseResume: "Resume Game",
+        pauseRules: "Rules",
+        pauseSettings: "Settings",
+        pauseLeave: "Quit to Menu",
+        soundOn: "Enabled",
+        soundOff: "Muted",
+        themeNames: {
+          forest: "Forest",
+          school: "School",
+          aquapark: "Water Park",
+          playground: "Playground Park",
+          mountains: "Mountains"
+        },
+        rulesContent: `
+          <p><b>Seeker's Goal:</b> Find all hidden players before time expires.</p>
+          <p><b>Hiders' Goal:</b> Stay hidden and survive until time runs out.</p>
+          <p><b>Phase 1 (Hiding):</b> The seeker is blinded for 20 seconds while hiders scatter and take cover.</p>
+          <p><b>How to Find:</b> Approach within 3 meters, look towards the player, and press <b>Space</b>.</p>
+          <p><b>Next Seeker:</b> The first player found becomes seeker next round (or chat vote <code>/seeker Nick</code>).</p>
+          <p><b>Quests:</b> Completing quests awards direction hints, extra time, and bonus score.</p>
+          <p><b>Controls:</b> Arrow keys (↑ ↓ ← →) or W A S D to move and steer, Space to interact, Enter for chat, Esc for pause.</p>
+        `,
+        chatHelp: "Commands: /seeker <nick> — propose seeker; /hiders <nick1,nick2> — propose hiders; /yes, /no — vote; /help — command list.",
+        botLines: [
+          "You won't find me here!",
+          "So cozy in this spot...",
+          "I hear footsteps nearby...",
+          "Nobody will ever spot me!",
+          "Oh! You caught me!",
+          "Found a great hiding spot!"
+        ],
+        botNames: ["Alex", "Sam", "Emma", "Liam", "Olivia", "Noah", "Maya", "Lucas", "Chloe", "Ethan"],
+        quests: {
+          forest: [
+            { id: "f1", text: "Collect 6 acorns", target: 6, reward: "hint", actionText: "Pick up acorn" },
+            { id: "f2", text: "Find 3 mushrooms", target: 3, reward: "time", actionText: "Pick mushroom" },
+            { id: "f3", text: "Ring the bell on the bridge", target: 1, reward: "speed", actionText: "Ring bell" },
+            { id: "f4", text: "Fill the squirrel feeder", target: 1, reward: "points", actionText: "Fill feeder" }
+          ],
+          school: [
+            { id: "s1", text: "Find 4 lost keys", target: 4, reward: "hint", actionText: "Pick up key" },
+            { id: "s2", text: "Ring the school bell", target: 1, reward: "time", actionText: "Ring school bell" },
+            { id: "s3", text: "Return 5 books to library shelves", target: 5, reward: "speed", actionText: "Place book" },
+            { id: "s4", text: "Water 3 flower pots in the atrium", target: 3, reward: "points", actionText: "Water plant" }
+          ],
+          aquapark: [
+            { id: "a1", text: "Collect 6 beach balls", target: 6, reward: "hint", actionText: "Grab beach ball" },
+            { id: "a2", text: "Find 3 towels", target: 3, reward: "time", actionText: "Collect towel" },
+            { id: "a3", text: "Press the wave-machine button", target: 1, reward: "speed", actionText: "Press wave button" },
+            { id: "a4", text: "Find the lifeguard's whistle", target: 1, reward: "points", actionText: "Pick up whistle" }
+          ],
+          playground: [
+            { id: "p1", text: "Collect 5 balloons", target: 5, reward: "hint", actionText: "Catch balloon" },
+            { id: "p2", text: "Push the carousel", target: 1, reward: "speed", actionText: "Push carousel" },
+            { id: "p3", text: "Activate 3 swings", target: 3, reward: "time", actionText: "Push swing" },
+            { id: "p4", text: "Find 3 lost toys", target: 3, reward: "points", actionText: "Pick up toy" }
+          ],
+          mountains: [
+            { id: "m1", text: "Find 4 crystals in caves", target: 4, reward: "hint", actionText: "Gather crystal" },
+            { id: "m2", text: "Feed the mountain goat (hay)", target: 1, reward: "speed", actionText: "Feed goat" },
+            { id: "m3", text: "Find 3 edelweiss flowers", target: 3, reward: "time", actionText: "Pick edelweiss" },
+            { id: "m4", text: "Photograph the sleeping bat (Space)", target: 1, reward: "points", actionText: "Take photo" }
+          ]
+        },
+        toastQuestDone: "Quest Completed! Reward: ",
+        rewards: {
+          hint: "Seeker directional hint!",
+          time: "+20 seconds time added!",
+          speed: "+15% run speed!",
+          points: "+150 bonus points!"
+        }
+      }
+    };
+
+    let curLang = (navigator.language && navigator.language.toLowerCase().startsWith('uk')) ? 'uk' : 'en';
+    try {
+      const savedLang = localStorage.getItem('hns_lang');
+      if (savedLang === 'uk' || savedLang === 'en') curLang = savedLang;
+    } catch(e){}
+
+    function t(key) {
+      return (I18N[curLang] && I18N[curLang][key]) || (I18N['en'] && I18N['en'][key]) || key;
+    }
+
+    // ===== UTILS (seeded RNG, math) =====
+    function mulberry32(a) {
+      return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+    function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+    function lerp(a, b, pct) { return a + (b - a) * pct; }
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
+    }
+    const NICK_COLORS = ['#D9822B', '#5B8C5A', '#4FA3C7', '#E07A5F', '#8C8C99', '#C8523A', '#7F5A83', '#3D8B8B', '#B8860B', '#4682B4'];
+    function getNickColor(name) {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      return NICK_COLORS[Math.abs(hash) % NICK_COLORS.length];
+    }
+    const BAD_WORDS = ['хуй', 'пізд', 'бля', 'єба', 'fuck', 'shit', 'bitch', 'asshole', 'cunt', 'dick'];
+    function filterProfanity(text) {
+      let clean = String(text);
+      for (const w of BAD_WORDS) {
+        clean = clean.replace(new RegExp(w, 'gi'), '***');
+      }
+      return clean;
+    }
+    function storageGet(key, def) {
+      try { const v = localStorage.getItem(key); return v !== null ? v : def; } catch(e) { return def; }
+    }
+    function storageSet(key, val) {
+      try { localStorage.setItem(key, val); } catch(e){}
+    }
+
+    // ===== AUDIO =====
+    class SoundFX {
+      constructor() {
+        this.ctx = null;
+        this.muted = storageGet('hns_sound', 'true') === 'false';
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+      }
+      playTick() {
+        if (this.muted) return;
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(820, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(320, this.ctx.currentTime + 0.035);
+        gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.035);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.035);
+      }
+      playWheelWin() {
+        if (this.muted) return;
+        this.init(); if (!this.ctx) return;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const t = this.ctx.currentTime + idx * 0.08;
+          osc.type = 'sine'; osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.14, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(t); osc.stop(t + 0.35);
+        });
+      }
+      playStep() {
+        if (this.muted) return;
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(45, this.ctx.currentTime + 0.045);
+        gain.gain.setValueAtTime(0.035, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.045);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.045);
+      }
+      playFind() {
+        if (this.muted) return;
+        this.init(); if (!this.ctx) return;
+        [880, 1320].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const t = this.ctx.currentTime + i * 0.12;
+          osc.type = 'sine'; osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.16, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.start(t); osc.stop(t + 0.38);
+        });
+      }
+      playQuestDing() {
+        if (this.muted) return;
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(987.77, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.14, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.4);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+      }
+      playBeep(freq = 440, duration = 0.1) {
+        if (this.muted) return;
+        this.init(); if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(0.09, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + duration);
+      }
+    }
+    const audio = new SoundFX();
+
+    // ===== UI (screens, HUD, wheel) =====
+    function showScreen(screenId) {
+      ['screen-menu', 'screen-multiplayer', 'screen-wheel', 'screen-lobby', 'screen-round-end', 'modal-rules', 'modal-settings', 'modal-pause'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+      });
+      if (screenId) {
+        const el = document.getElementById(screenId);
+        if (el) el.style.display = 'flex';
+      }
+    }
+    function openModal(id) { const el = document.getElementById(id); if (el) el.style.display = 'flex'; }
+    function closeModal(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+    function showToast(text) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = text;
+      container.appendChild(toast);
+      setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3200);
+    }
+
+    // ===== NET =====
+    class NetManager {
+      constructor() {
+        this.mode = 'solo';
+        this.roomCode = '';
+        this.isHost = false;
+        this.myId = '';
+        this.channel = null;
+        this.peer = null;
+        this.connections = new Map();
+        this.onMessageCb = null;
+        this.onPeerChangeCb = null;
+      }
+      initBroadcast(roomCode, isHost, myId, onMsg, onPeerChange) {
+        this.mode = 'broadcast';
+        this.roomCode = roomCode;
+        this.isHost = isHost;
+        this.myId = myId;
+        this.onMessageCb = onMsg;
+        this.onPeerChangeCb = onPeerChange;
+        this.channel = new BroadcastChannel('hns-' + roomCode);
+        this.channel.onmessage = (evt) => {
+          const msg = evt.data;
+          if (msg && msg.sender !== this.myId && this.onMessageCb) this.onMessageCb(msg);
+        };
+      }
+      initPeerJS(roomCode, isHost, myId, onMsg, onPeerChange, onError) {
+        this.mode = 'peerjs';
+        this.roomCode = roomCode;
+        this.isHost = isHost;
+        this.myId = myId;
+        this.onMessageCb = onMsg;
+        this.onPeerChangeCb = onPeerChange;
+        if (typeof Peer === 'undefined') {
+          if (onError) onError('PeerJS offline. Use Local Test.');
+          return;
+        }
+        const peerTargetId = isHost ? ('hns-' + roomCode) : undefined;
+        try {
+          this.peer = new Peer(peerTargetId, { debug: 0 });
+        } catch(e) {
+          if (onError) onError(e.message);
+          return;
+        }
+        this.peer.on('open', (id) => {
+          this.myId = id;
+          if (!isHost) {
+            const conn = this.peer.connect('hns-' + roomCode, { reliable: true });
+            this.setupConn(conn);
+          }
+        });
+        this.peer.on('connection', (conn) => {
+          if (this.connections.size >= 10) { conn.close(); return; }
+          this.setupConn(conn);
+        });
+        this.peer.on('error', (err) => { if (onError) onError(err.message || 'Error'); });
+      }
+      setupConn(conn) {
+        conn.on('open', () => {
+          this.connections.set(conn.peer, conn);
+          if (this.onPeerChangeCb) this.onPeerChangeCb();
+        });
+        conn.on('data', (data) => {
+          if (this.onMessageCb) this.onMessageCb(data);
+          if (this.isHost && data && data.type !== 'input') {
+            this.broadcast(data.type, data.payload, conn.peer);
+          }
+        });
+        conn.on('close', () => {
+          this.connections.delete(conn.peer);
+          if (this.onPeerChangeCb) this.onPeerChangeCb();
+        });
+      }
+      send(type, payload) {
+        const msg = { type, payload, sender: this.myId, time: Date.now() };
+        if (this.mode === 'broadcast') {
+          if (this.channel) this.channel.postMessage(msg);
+        } else if (this.mode === 'peerjs') {
+          this.connections.forEach((conn) => { if (conn.open) conn.send(msg); });
+        }
+      }
+      broadcast(type, payload, excludePeerId) {
+        const msg = { type, payload, sender: this.myId, time: Date.now() };
+        if (this.mode === 'broadcast') {
+          if (this.channel) this.channel.postMessage(msg);
+        } else if (this.mode === 'peerjs') {
+          this.connections.forEach((conn, pid) => {
+            if (pid !== excludePeerId && conn.open) conn.send(msg);
+          });
+        }
+      }
+      disconnect() {
+        if (this.channel) { this.channel.close(); this.channel = null; }
+        if (this.peer) { this.peer.destroy(); this.peer = null; }
+        this.connections.clear();
+        this.mode = 'solo';
+      }
+    }
+    const NET = new NetManager();
+
+    // ===== WORLD (theme builders) =====
+    const TEXTURES = {};
+    function initTextures() {
+      const makeTex = (w, h, fill, drawer) => {
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d'); ctx.fillStyle = fill; ctx.fillRect(0, 0, w, h);
+        if (drawer) drawer(ctx, w, h);
+        const tex = new THREE.CanvasTexture(c);
+        tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+      };
+      TEXTURES.grass = makeTex(256, 256, '#7FA35B', (ctx) => {
+        for (let i = 0; i < 3000; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? '#8BB363' : '#739552';
+          ctx.fillRect(Math.random() * 256, Math.random() * 256, 1.5, 3);
+        }
+      });
+      TEXTURES.bark = makeTex(128, 128, '#7A522C', (ctx) => {
+        ctx.fillStyle = '#5A3B1E';
+        for (let i = 0; i < 40; i++) ctx.fillRect(Math.random() * 128, 0, Math.random() * 4 + 2, 128);
+      });
+      TEXTURES.wood = makeTex(256, 256, '#A9773F', (ctx) => {
+        ctx.strokeStyle = '#82592B'; ctx.lineWidth = 2;
+        for (let y = 0; y < 256; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(256, y); ctx.stroke(); }
+      });
+      TEXTURES.brick = makeTex(256, 256, '#D4C4B0', (ctx) => {
+        ctx.fillStyle = '#BA644A';
+        for (let row = 0; row < 14; row++) {
+          const off = (row % 2) * 26;
+          for (let col = -1; col < 7; col++) ctx.fillRect(col * 52 + off, row * 24, 48, 20);
+        }
+      });
+      TEXTURES.stone = makeTex(128, 128, '#B7AE9F', (ctx) => {
+        for (let i = 0; i < 1500; i++) {
+          ctx.fillStyle = Math.random() > 0.5 ? '#A89F90' : '#C4BCAD';
+          ctx.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+        }
+      });
+      TEXTURES.water = makeTex(128, 128, '#4FA3C7', (ctx) => {
+        ctx.fillStyle = '#7AC3E0';
+        for (let i = 0; i < 25; i++) {
+          ctx.beginPath(); ctx.arc(Math.random() * 128, Math.random() * 128, Math.random() * 14 + 4, 0, Math.PI * 2); ctx.fill();
+        }
+      });
+    }
+
+    let WORLD_COLLIDERS = [];
+    let HIDE_SPOTS = [];
+    let INTERACTABLES = [];
+
+    function clearWorld(scene) {
+      for (let i = scene.children.length - 1; i >= 0; i--) {
+        const obj = scene.children[i];
+        if (obj.userData.isWorld) {
+          scene.remove(obj);
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+            else obj.material.dispose();
+          }
+        }
+      }
+      WORLD_COLLIDERS = [];
+      HIDE_SPOTS = [];
+      INTERACTABLES = [];
+    }
+
+    function addColliderBox(minX, maxX, minZ, maxZ) { WORLD_COLLIDERS.push({ type: 'box', minX, maxX, minZ, maxZ }); }
+    function addColliderCyl(x, z, radius) { WORLD_COLLIDERS.push({ type: 'cylinder', x, z, radius }); }
+
+    function buildBoundaries(scene, fenceColor = '#8A6743') {
+      const half = CONFIG.arenaSize / 2;
+      const bMat = new THREE.MeshStandardMaterial({ color: fenceColor, roughness: 0.9, map: TEXTURES.wood });
+      const bH = new THREE.BoxGeometry(CONFIG.arenaSize, 3, 1);
+      const bV = new THREE.BoxGeometry(1, 3, CONFIG.arenaSize);
+
+      const addWall = (geo, x, z) => {
+        const m = new THREE.Mesh(geo, bMat); m.position.set(x, 1.5, z);
+        m.castShadow = true; m.receiveShadow = true; m.userData.isWorld = true; scene.add(m);
+      };
+      addWall(bH, 0, -half); addColliderBox(-half, half, -half - 1, -half + 1);
+      addWall(bH, 0, half); addColliderBox(-half, half, half - 1, half + 1);
+      addWall(bV, -half, 0); addColliderBox(-half - 1, -half + 1, -half, half);
+      addWall(bV, half, 0); addColliderBox(half - 1, half + 1, -half, half);
+    }
+
+    // 1. Forest
+    function buildForest(scene, rng) {
+      clearWorld(scene);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.arenaSize, CONFIG.arenaSize), new THREE.MeshStandardMaterial({ color: '#7FA35B', roughness: 0.85, map: TEXTURES.grass }));
+      TEXTURES.grass.repeat.set(16, 16); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.isWorld = true; scene.add(ground);
+      buildBoundaries(scene, '#7A522C');
+
+      const stream = new THREE.Mesh(new THREE.PlaneGeometry(14, CONFIG.arenaSize), new THREE.MeshStandardMaterial({ color: '#4FA3C7', roughness: 0.2, map: TEXTURES.water }));
+      stream.rotation.x = -Math.PI / 2; stream.position.set(10, 0.05, 0); stream.userData.isWorld = true; scene.add(stream);
+
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(16, 0.4, 6), new THREE.MeshStandardMaterial({ color: '#9C6F3B', map: TEXTURES.wood }));
+      bridge.position.set(10, 0.25, 0); bridge.castShadow = true; bridge.receiveShadow = true; bridge.userData.isWorld = true; scene.add(bridge);
+
+      const bell = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.4, 12), new THREE.MeshStandardMaterial({ color: '#D9A441', metalness: 0.6 }));
+      bell.position.set(16, 2.1, 2.5); bell.userData.isWorld = true; scene.add(bell);
+      INTERACTABLES.push({ id: 'f3', type: 'quest', x: 16, z: 2.5, mesh: bell, actionText: "Подзвонити в дзвоник" });
+
+      const treeCount = 70;
+      const trunkInst = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.35, 0.5, 4, 8), new THREE.MeshStandardMaterial({ color: '#664526', map: TEXTURES.bark }), treeCount);
+      const foliageInst = new THREE.InstancedMesh(new THREE.ConeGeometry(2.4, 5, 8), new THREE.MeshStandardMaterial({ color: '#4E7336', roughness: 0.8 }), treeCount);
+      trunkInst.castShadow = true; trunkInst.receiveShadow = true; foliageInst.castShadow = true; foliageInst.receiveShadow = true;
+      trunkInst.userData.isWorld = true; foliageInst.userData.isWorld = true;
+
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < treeCount; i++) {
+        let x = (rng() - 0.5) * (CONFIG.arenaSize - 16);
+        let z = (rng() - 0.5) * (CONFIG.arenaSize - 16);
+        if (Math.abs(x - 10) < 9) x += 15;
+        const s = rng() * 0.4 + 0.8;
+        dummy.position.set(x, 2 * s, z); dummy.scale.set(s, s, s); dummy.updateMatrix(); trunkInst.setMatrixAt(i, dummy.matrix);
+        dummy.position.set(x, 6 * s, z); dummy.updateMatrix(); foliageInst.setMatrixAt(i, dummy.matrix);
+        addColliderCyl(x, z, 0.6 * s);
+        if (i < 18) HIDE_SPOTS.push({ name: `Behind Tree ${i + 1}`, x: x + 0.8, z: z + 0.8, radius: 1.5, type: 'tree' });
+      }
+      trunkInst.instanceMatrix.needsUpdate = true; foliageInst.instanceMatrix.needsUpdate = true;
+      scene.add(trunkInst); scene.add(foliageInst);
+
+      [-25, -35].forEach((tx, idx) => {
+        const tent = new THREE.Mesh(new THREE.ConeGeometry(2.5, 2.8, 4), new THREE.MeshStandardMaterial({ color: idx === 0 ? '#E07A5F' : '#D9A441' }));
+        tent.position.set(tx, 1.4, -20); tent.rotation.y = Math.PI / 4; tent.castShadow = true; tent.receiveShadow = true; tent.userData.isWorld = true; scene.add(tent);
+        addColliderBox(tx - 2, tx + 2, -22, -18);
+        HIDE_SPOTS.push({ name: `Inside Tent ${idx + 1}`, x: tx, z: -20, radius: 2.0, type: 'tent' });
+      });
+
+      const stump = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.8, 1.6, 12, 1, true), new THREE.MeshStandardMaterial({ color: '#664526', map: TEXTURES.bark }));
+      stump.position.set(-15, 0.8, 15); stump.castShadow = true; stump.receiveShadow = true; stump.userData.isWorld = true; scene.add(stump);
+      addColliderCyl(-15, 15, 1.7);
+      HIDE_SPOTS.push({ name: "Hollow Stump", x: -15, z: 15, radius: 1.8, type: 'stump' });
+
+      const feeder = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), new THREE.MeshStandardMaterial({ color: '#A9773F' }));
+      feeder.position.set(-10, 1.5, -15); feeder.userData.isWorld = true; scene.add(feeder);
+      INTERACTABLES.push({ id: 'f4', type: 'quest', x: -10, z: -15, mesh: feeder, actionText: "Покласти горішки" });
+
+      [
+        { name: "Under the Wooden Bridge", x: 10, z: -2, radius: 2.0, type: 'bridge' },
+        { name: "Campfire Log Stack", x: -28, z: -14, radius: 1.5, type: 'logs' },
+        { name: "Dense Blackberry Bush", x: 28, z: -35, radius: 1.5, type: 'bush' },
+        { name: "Birch Clearing", x: 38, z: 20, radius: 2.0, type: 'clearing' },
+        { name: "Mossy Boulder Hollow", x: -35, z: 30, radius: 2.0, type: 'rock' },
+        { name: "Ranger Watch Post", x: -45, z: -45, radius: 2.5, type: 'structure' }
+      ].forEach(s => HIDE_SPOTS.push(s));
+    }
+
+    // 2. School
+    function buildSchool(scene, rng) {
+      clearWorld(scene);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.arenaSize, CONFIG.arenaSize), new THREE.MeshStandardMaterial({ color: '#E8D9B5', roughness: 0.8, map: TEXTURES.stone }));
+      TEXTURES.stone.repeat.set(24, 24); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.isWorld = true; scene.add(ground);
+      buildBoundaries(scene, '#BA644A');
+
+      const wallMat = new THREE.MeshStandardMaterial({ color: '#D9A441', roughness: 0.7, map: TEXTURES.brick });
+      const rooms = [
+        { name: "Classroom 101", x: -24, z: -20, w: 18, d: 14 },
+        { name: "Classroom 102", x: 24, z: -20, w: 18, d: 14 },
+        { name: "Library", x: -24, z: 20, w: 18, d: 18 },
+        { name: "Cafeteria", x: 24, z: 20, w: 18, d: 18 }
+      ];
+      rooms.forEach((r) => {
+        const f = new THREE.Mesh(new THREE.BoxGeometry(r.w, 0.2, r.d), new THREE.MeshStandardMaterial({ color: '#F2EBDD' }));
+        f.position.set(r.x, 0.1, r.z); f.receiveShadow = true; f.userData.isWorld = true; scene.add(f);
+        const w1 = new THREE.Mesh(new THREE.BoxGeometry(r.w, 3.2, 0.6), wallMat);
+        w1.position.set(r.x, 1.6, r.z - r.d / 2); w1.castShadow = true; w1.receiveShadow = true; w1.userData.isWorld = true; scene.add(w1);
+        addColliderBox(r.x - r.w / 2, r.x + r.w / 2, r.z - r.d / 2 - 0.5, r.z - r.d / 2 + 0.5);
+
+        for (let row = -1; row <= 1; row++) {
+          for (let col = -1; col <= 1; col++) {
+            const desk = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.9, 1.0), new THREE.MeshStandardMaterial({ color: '#A9773F', map: TEXTURES.wood }));
+            const dx = r.x + col * 4; const dz = r.z + row * 3.5;
+            desk.position.set(dx, 0.45, dz); desk.castShadow = true; desk.receiveShadow = true; desk.userData.isWorld = true; scene.add(desk);
+            addColliderBox(dx - 1, dx + 1, dz - 0.5, dz + 0.5);
+            HIDE_SPOTS.push({ name: `Desk in ${r.name}`, x: dx + 0.5, z: dz + 0.7, radius: 1.2, type: 'desk' });
+          }
+        }
+      });
+
+      const fountain = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 1.2, 16), new THREE.MeshStandardMaterial({ color: '#B7AE9F' }));
+      fountain.position.set(0, 0.6, 0); fountain.castShadow = true; fountain.receiveShadow = true; fountain.userData.isWorld = true; scene.add(fountain);
+      addColliderCyl(0, 0, 3.6); HIDE_SPOTS.push({ name: "Behind Atrium Fountain", x: 0, z: 4.2, radius: 2.0, type: 'fountain' });
+
+      const sBell = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 12), new THREE.MeshStandardMaterial({ color: '#D9A441', metalness: 0.8 }));
+      sBell.position.set(0, 3.0, -8); sBell.userData.isWorld = true; scene.add(sBell);
+      INTERACTABLES.push({ id: 's2', type: 'quest', x: 0, z: -8, mesh: sBell, actionText: "Увімкнути дзвінок" });
+
+      [[-6, -4], [6, -4], [0, 6]].forEach((pos, idx) => {
+        const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 0.7, 8), new THREE.MeshStandardMaterial({ color: '#C8523A' }));
+        pot.position.set(pos[0], 0.35, pos[1]); pot.userData.isWorld = true; scene.add(pot);
+        INTERACTABLES.push({ id: `s4_${idx}`, questGroup: 's4', type: 'quest', x: pos[0], z: pos[1], mesh: pot, actionText: "Полити вазон" });
+        HIDE_SPOTS.push({ name: `Flower Pot ${idx + 1}`, x: pos[0], z: pos[1], radius: 1.2, type: 'pot' });
+      });
+
+      for (let i = 0; i < 4; i++) {
+        const sx = -24 + (i - 1.5) * 3.2; const sz = 22;
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(1.0, 2.6, 5.0), new THREE.MeshStandardMaterial({ color: '#6A4A28', map: TEXTURES.wood }));
+        shelf.position.set(sx, 1.3, sz); shelf.castShadow = true; shelf.receiveShadow = true; shelf.userData.isWorld = true; scene.add(shelf);
+        addColliderBox(sx - 0.5, sx + 0.5, sz - 2.5, sz + 2.5);
+        HIDE_SPOTS.push({ name: `Library Shelf ${i + 1}`, x: sx, z: sz - 2.8, radius: 1.5, type: 'shelf' });
+      }
+
+      const bleacher = new THREE.Mesh(new THREE.BoxGeometry(12, 1.8, 3.0), new THREE.MeshStandardMaterial({ color: '#5B8C5A' }));
+      bleacher.position.set(-45, 0.9, 0); bleacher.castShadow = true; bleacher.receiveShadow = true; bleacher.userData.isWorld = true; scene.add(bleacher);
+      addColliderBox(-51, -39, -1.5, 1.5);
+      HIDE_SPOTS.push({ name: "Behind Gym Bleachers", x: -45, z: 2.2, radius: 2.0, type: 'gym' });
+      HIDE_SPOTS.push({ name: "Under Gym Scoreboard", x: -45, z: -2.2, radius: 2.0, type: 'gym' });
+    }
+
+    // 3. Water Park
+    function buildAquapark(scene, rng) {
+      clearWorld(scene);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.arenaSize, CONFIG.arenaSize), new THREE.MeshStandardMaterial({ color: '#E8D9B5', roughness: 0.7, map: TEXTURES.stone }));
+      TEXTURES.stone.repeat.set(20, 20); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.isWorld = true; scene.add(ground);
+      buildBoundaries(scene, '#4FA3C7');
+
+      const pool = new THREE.Mesh(new THREE.PlaneGeometry(36, 26), new THREE.MeshStandardMaterial({ color: '#4FA3C7', roughness: 0.15, map: TEXTURES.water }));
+      pool.rotation.x = -Math.PI / 2; pool.position.set(0, 0.05, -15); pool.userData.isWorld = true; scene.add(pool);
+
+      const btnPod = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 1.1, 8), new THREE.MeshStandardMaterial({ color: '#E07A5F' }));
+      btnPod.position.set(0, 0.55, -29); btnPod.userData.isWorld = true; scene.add(btnPod);
+      INTERACTABLES.push({ id: 'a3', type: 'quest', x: 0, z: -29, mesh: btnPod, actionText: "Запустити хвилю" });
+
+      const towerBase = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 2.4), new THREE.MeshStandardMaterial({ color: '#FFF9EE', map: TEXTURES.wood }));
+      towerBase.position.set(22, 1.6, -15); towerBase.castShadow = true; towerBase.receiveShadow = true; towerBase.userData.isWorld = true; scene.add(towerBase);
+      addColliderBox(20.5, 23.5, -16.5, -13.5);
+      HIDE_SPOTS.push({ name: "Under Lifeguard Tower", x: 22, z: -15, radius: 2.0, type: 'tower' });
+
+      const whistle = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshStandardMaterial({ color: '#D9A441', metalness: 0.7 }));
+      whistle.position.set(22, 3.5, -14.2); whistle.userData.isWorld = true; scene.add(whistle);
+      INTERACTABLES.push({ id: 'a4', type: 'quest', x: 22, z: -14.2, mesh: whistle, actionText: "Взяти свисток" });
+
+      const slidePillar = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 8, 12), new THREE.MeshStandardMaterial({ color: '#D9822B' }));
+      slidePillar.position.set(-25, 4, -15); slidePillar.castShadow = true; slidePillar.receiveShadow = true; slidePillar.userData.isWorld = true; scene.add(slidePillar);
+      addColliderCyl(-25, -15, 2.0); HIDE_SPOTS.push({ name: "Behind Slide Pillar", x: -25, z: -18, radius: 2.5, type: 'slide' });
+
+      for (let i = 0; i < 6; i++) {
+        const lx = -25 + (i % 3) * 6; const lz = 15 + Math.floor(i / 3) * 8;
+        const lounger = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 2.4), new THREE.MeshStandardMaterial({ color: '#FFF9EE' }));
+        lounger.position.set(lx, 0.2, lz); lounger.castShadow = true; lounger.receiveShadow = true; lounger.userData.isWorld = true; scene.add(lounger);
+        addColliderBox(lx - 0.6, lx + 0.6, lz - 1.2, lz + 1.2);
+        const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.6, 0.8, 8), new THREE.MeshStandardMaterial({ color: i % 2 === 0 ? '#E07A5F' : '#5B8C5A' }));
+        canopy.position.set(lx + 1.2, 2.8, lz); canopy.castShadow = true; canopy.userData.isWorld = true; scene.add(canopy);
+        HIDE_SPOTS.push({ name: `Under Beach Umbrella ${i + 1}`, x: lx + 1.2, z: lz, radius: 1.5, type: 'umbrella' });
+        HIDE_SPOTS.push({ name: `Behind Sun Lounger ${i + 1}`, x: lx, z: lz + 1.4, radius: 1.5, type: 'lounger' });
+      }
+
+      for (let c = 0; c < 4; c++) {
+        const cx = 15 + c * 4; const cz = 25;
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.0, 2.8, 2.6), new THREE.MeshStandardMaterial({ color: '#4FA3C7', map: TEXTURES.wood }));
+        cabin.position.set(cx, 1.4, cz); cabin.castShadow = true; cabin.receiveShadow = true; cabin.userData.isWorld = true; scene.add(cabin);
+        addColliderBox(cx - 1.5, cx + 1.5, cz - 1.3, cz + 1.3);
+        HIDE_SPOTS.push({ name: `Changing Cabin ${c + 1}`, x: cx, z: cz + 1.8, radius: 1.6, type: 'cabin' });
+      }
+
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(8, 3.0, 4), new THREE.MeshStandardMaterial({ color: '#D9A441' }));
+      bar.position.set(0, 1.5, 38); bar.castShadow = true; bar.receiveShadow = true; bar.userData.isWorld = true; scene.add(bar);
+      addColliderBox(-4.2, 4.2, 35.8, 40.2); HIDE_SPOTS.push({ name: "Behind Snack Bar Counter", x: 0, z: 41, radius: 2.0, type: 'snack' });
+
+      [
+        { name: "Lazy River Abutment", x: -10, z: -35, radius: 2.0, type: 'bridge' },
+        { name: "Inflatable Ring Stack", x: -35, z: 10, radius: 1.8, type: 'rings' },
+        { name: "Palm Grove East", x: 38, z: -30, radius: 2.0, type: 'palms' },
+        { name: "Palm Grove West", x: -38, z: -30, radius: 2.0, type: 'palms' },
+        { name: "VIP Cabana Curtain", x: 35, z: 12, radius: 2.0, type: 'cabana' },
+        { name: "Filter Room Alcove", x: -38, z: 35, radius: 2.2, type: 'room' },
+        { name: "Kids Splash Mushroom", x: -12, z: 0, radius: 1.8, type: 'mushroom' }
+      ].forEach(s => HIDE_SPOTS.push(s));
+    }
+
+    // 4. Playground Park
+    function buildPlaygroundPark(scene, rng) {
+      clearWorld(scene);
+      const ground = new THREE.Mesh(new THREE.PlaneGeometry(CONFIG.arenaSize, CONFIG.arenaSize), new THREE.MeshStandardMaterial({ color: '#7FA35B', roughness: 0.85, map: TEXTURES.grass }));
+      TEXTURES.grass.repeat.set(16, 16); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.isWorld = true; scene.add(ground);
+      buildBoundaries(scene, '#5B8C5A');
+
+      const carGroup = new THREE.Group(); carGroup.position.set(0, 0, 0);
+      const carBase = new THREE.Mesh(new THREE.CylinderGeometry(4.0, 4.0, 0.3, 16), new THREE.MeshStandardMaterial({ color: '#E07A5F' }));
+      carBase.position.y = 0.15; carGroup.add(carBase);
+      carGroup.userData.isWorld = true; scene.add(carGroup);
+      addColliderCyl(0, 0, 4.0);
+      INTERACTABLES.push({ id: 'p2', type: 'quest', x: 0, z: 0, mesh: carGroup, actionText: "Штовхнути карусель" });
+      HIDE_SPOTS.push({ name: "Behind Carousel", x: 0, z: 4.5, radius: 2.0, type: 'carousel' });
+
+      [-18, -24, -30].forEach((sx, idx) => {
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 3.2, 0.3), new THREE.MeshStandardMaterial({ color: '#4FA3C7' }));
+        frame.position.set(sx, 1.6, -18); frame.castShadow = true; frame.receiveShadow = true; frame.userData.isWorld = true; scene.add(frame);
+        addColliderBox(sx - 1.8, sx + 1.8, -18.5, -17.5);
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.4), new THREE.MeshStandardMaterial({ color: '#A9773F' }));
+        seat.position.set(sx, 0.8, -18); seat.userData.isWorld = true; scene.add(seat);
+        INTERACTABLES.push({ id: `p3_${idx}`, questGroup: 'p3', type: 'quest', x: sx, z: -18, mesh: seat, actionText: "Штовхнути гойдалку" });
+        HIDE_SPOTS.push({ name: `Behind Swing ${idx + 1}`, x: sx, z: -19.5, radius: 1.5, type: 'swing' });
+      });
+
+      const sand = new THREE.Mesh(new THREE.BoxGeometry(6, 0.4, 6), new THREE.MeshStandardMaterial({ color: '#E8D9B5', roughness: 0.9 }));
+      sand.position.set(22, 0.2, -18); sand.userData.isWorld = true; scene.add(sand);
+      HIDE_SPOTS.push({ name: "Sandbox Edge", x: 22, z: -21.5, radius: 2.0, type: 'sandbox' });
+
+      [[-20, 20], [20, 20]].forEach((pos, idx) => {
+        const house = new THREE.Mesh(new THREE.BoxGeometry(4.0, 3.2, 3.5), new THREE.MeshStandardMaterial({ color: idx === 0 ? '#E07A5F' : '#D9A441', map: TEXTURES.wood }));
+        house.position.set(pos[0], 1.6, pos[1]); house.castShadow = true; house.receiveShadow = true; house.userData.isWorld = true; scene.add(house);
+        addColliderBox(pos[0] - 2.1, pos[0] + 2.1, pos[1] - 1.8, pos[1] + 1.8);
+        HIDE_SPOTS.push({ name: `Playhouse ${idx + 1}`, x: pos[0], z: pos[1], radius: 2.0, type: 'house' });
+      });
+
+      const tunnel = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 5, 12, 1, true), new THREE.MeshStandardMaterial({ color: '#5B8C5A' }));
+      tunnel.rotation.z = Math.PI / 2; tunnel.position.set(0, 1.2, 28); tunnel.castShadow = true; tunnel.userData.isWorld = true; scene.add(tunnel);
+      addColliderBox(-2.6, 2.6, 26.6, 29.4);
+      HIDE_SPOTS.push({ name: "Inside Crawler Tunnel", x: 0, z: 28, radius: 2.0, type: 'tunnel' });
+
+      const hedgeMat = new THREE.MeshStandardMaterial({ color: '#4E7336', roughness: 0.9 });
+      for (let h = 0; h < 6; h++) {
+        const hx = -35 + (h % 2) * 70; const hz = -5 + Math.floor(h / 2) * 14;
+        const hedge = new THREE.Mesh(new THREE.BoxGeometry(8, 2.2, 1.4), hedgeMat);
+        hedge.position.set(hx, 1.1, hz); hedge.castShadow = true; hedge.receiveShadow = true; hedge.userData.isWorld = true; scene.add(hedge);
+        addColliderBox(hx - 4, hx + 4, hz - 0.7, hz + 0.7);
+        HIDE_SPOTS.push({ name: `Hedge Row ${h + 1}`, x: hx, z: hz + 1.2, radius: 1.8, type: 'hedge' });
+      }
+
+      [
+        { name: "Under Double Seesaw", x: 12, z: -10, radius: 1.5, type: 'seesaw' },
+        { name: "Climbing Pyramid Corner", x: -12, z: -10, radius: 1.8, type: 'climbing' },
+        { name: "Park Benches Row", x: 35, z: 0, radius: 1.5, type: 'bench' },
+        { name: "Rose Garden Trellis", x: -35, z: 0, radius: 1.8, type: 'garden' },
+        { name: "Maintenance Shed Back", x: 42, z: 42, radius: 2.2, type: 'shed' },
+        { name: "Rubber Tire Stack", x: -42, z: -42, radius: 1.6, type: 'tires' },
+        { name: "Gazebo Pavilion Corner", x: -15, z: 35, radius: 2.0, type: 'gazebo' },
+        { name: "Fountain Basin Alcove", x: 28, z: -35, radius: 2.0, type: 'fountain' }
+      ].forEach(s => HIDE_SPOTS.push(s));
+    }
+
+    // 5. Mountains
+    function buildMountains(scene, rng) {
+      clearWorld(scene);
+      const groundGeo = new THREE.PlaneGeometry(CONFIG.arenaSize, CONFIG.arenaSize, 32, 32);
+      const posAttr = groundGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const vx = posAttr.getX(i); const vy = posAttr.getY(i);
+        const dist = Math.sqrt(vx * vx + vy * vy);
+        const zH = Math.sin(vx * 0.08) * 1.5 + Math.cos(vy * 0.08) * 1.5 + (dist > 35 ? (dist - 35) * 0.15 : 0);
+        posAttr.setZ(i, zH);
+      }
+      groundGeo.computeVertexNormals();
+
+      const ground = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: '#8C8C99', roughness: 0.9, map: TEXTURES.stone }));
+      TEXTURES.stone.repeat.set(16, 16); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.userData.isWorld = true; scene.add(ground);
+      buildBoundaries(scene, '#736E67');
+
+      const caves = [
+        { name: "Crystal Cave", x: -32, z: -25 },
+        { name: "Echo Cave", x: 32, z: -25 },
+        { name: "Sleeping Bat Cave", x: 0, z: -42 }
+      ];
+      caves.forEach((cv) => {
+        const caveArch = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 8), new THREE.MeshStandardMaterial({ color: '#57534E', roughness: 0.9 }));
+        caveArch.position.set(cv.x, 2.5, cv.z); caveArch.castShadow = true; caveArch.receiveShadow = true; caveArch.userData.isWorld = true; scene.add(caveArch);
+        addColliderBox(cv.x - 4.5, cv.x + 4.5, cv.z - 4, cv.z + 4);
+        const caveLight = new THREE.PointLight('#FFE3B3', 1.2, 14);
+        caveLight.position.set(cv.x, 3.0, cv.z); caveLight.userData.isWorld = true; scene.add(caveLight);
+        HIDE_SPOTS.push({ name: `Inside ${cv.name}`, x: cv.x, z: cv.z + 4.8, radius: 2.5, type: 'cave' });
+      });
+
+      const batMesh = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 5), new THREE.MeshStandardMaterial({ color: '#2B2620' }));
+      batMesh.position.set(0, 4.2, -42); batMesh.rotation.z = Math.PI; batMesh.userData.isWorld = true; scene.add(batMesh);
+      INTERACTABLES.push({ id: 'm4', type: 'quest', x: 0, z: -42, mesh: batMesh, actionText: "Сфотографувати кажана" });
+
+      const pen = new THREE.Mesh(new THREE.BoxGeometry(5, 1.2, 5), new THREE.MeshStandardMaterial({ color: '#A9773F', map: TEXTURES.wood }));
+      pen.position.set(-20, 0.6, 20); pen.userData.isWorld = true; scene.add(pen);
+      addColliderBox(-22.5, -17.5, 17.5, 22.5);
+
+      const goatBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.6), new THREE.MeshStandardMaterial({ color: '#F4EBDD' }));
+      goatBody.position.set(-20, 0.8, 20); goatBody.userData.isWorld = true; scene.add(goatBody);
+      INTERACTABLES.push({ id: 'm2', type: 'quest', x: -20, z: 20, mesh: goatBody, actionText: "Дати сіно кізці" });
+      HIDE_SPOTS.push({ name: "Behind Goat Pen", x: -20, z: 23.2, radius: 2.0, type: 'pen' });
+
+      for (let b = 0; b < 14; b++) {
+        const bx = (rng() - 0.5) * 80; const bz = (rng() - 0.5) * 70; const bs = rng() * 1.5 + 1.2;
+        const bMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(bs, 1), new THREE.MeshStandardMaterial({ color: '#8A857D', roughness: 0.9 }));
+        bMesh.position.set(bx, bs * 0.8, bz); bMesh.castShadow = true; bMesh.receiveShadow = true; bMesh.userData.isWorld = true; scene.add(bMesh);
+        addColliderCyl(bx, bz, bs);
+        if (b < 10) HIDE_SPOTS.push({ name: `Mountain Boulder ${b + 1}`, x: bx + 1.2, z: bz + 1.2, radius: 1.8, type: 'boulder' });
+      }
+
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 4), new THREE.MeshStandardMaterial({ color: '#A9773F', map: TEXTURES.wood }));
+      bridge.position.set(20, 1.2, 10); bridge.castShadow = true; bridge.receiveShadow = true; bridge.userData.isWorld = true; scene.add(bridge);
+      HIDE_SPOTS.push({ name: "Under Mountain Footbridge", x: 20, z: 10, radius: 2.0, type: 'bridge' });
+
+      [
+        { name: "Alpine Trail Crevice", x: -10, z: -10, radius: 1.8, type: 'trail' },
+        { name: "Summit Rock Cairn", x: 0, z: 35, radius: 2.0, type: 'cairn' },
+        { name: "Eagle Nest Ledge", x: 38, z: 30, radius: 2.2, type: 'ledge' },
+        { name: "Mountain Rescuer Post", x: -38, z: 30, radius: 2.0, type: 'hut' },
+        { name: "Waterfall Spray Rock", x: 15, z: -35, radius: 2.0, type: 'waterfall' }
+      ].forEach(s => HIDE_SPOTS.push(s));
+    }
+
+    // ===== CHARACTERS (models + walk animation + nickname labels) =====
+    function createCharacterMesh(clothingColor = '#D9822B') {
+      const root = new THREE.Group();
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.60, 0.28), new THREE.MeshStandardMaterial({ color: clothingColor, roughness: 0.7 }));
+      torso.position.y = 0.95; torso.castShadow = true; torso.receiveShadow = true; root.add(torso);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.20, 16, 16), new THREE.MeshStandardMaterial({ color: '#F2D3B8', roughness: 0.6 }));
+      head.position.y = 1.42; head.castShadow = true; root.add(head);
+
+      const hair = new THREE.Mesh(new THREE.SphereGeometry(0.21, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color: '#573D26', roughness: 0.8 }));
+      hair.position.y = 1.44; hair.rotation.x = -0.1; root.add(hair);
+
+      const pantsMat = new THREE.MeshStandardMaterial({ color: '#3B4859', roughness: 0.8 });
+      const legGeo = new THREE.BoxGeometry(0.16, 0.60, 0.18);
+      const leftLegGroup = new THREE.Group(); leftLegGroup.position.set(-0.14, 0.65, 0);
+      const leftLeg = new THREE.Mesh(legGeo, pantsMat); leftLeg.position.y = -0.30; leftLeg.castShadow = true; leftLegGroup.add(leftLeg); root.add(leftLegGroup);
+
+      const rightLegGroup = new THREE.Group(); rightLegGroup.position.set(0.14, 0.65, 0);
+      const rightLeg = new THREE.Mesh(legGeo, pantsMat); rightLeg.position.y = -0.30; rightLeg.castShadow = true; rightLegGroup.add(rightLeg); root.add(rightLegGroup);
+
+      const armGeo = new THREE.BoxGeometry(0.13, 0.55, 0.14);
+      const leftArmGroup = new THREE.Group(); leftArmGroup.position.set(-0.31, 1.20, 0);
+      const leftArm = new THREE.Mesh(armGeo, torso.material); leftArm.position.y = -0.25; leftArm.castShadow = true; leftArmGroup.add(leftArm); root.add(leftArmGroup);
+
+      const rightArmGroup = new THREE.Group(); rightArmGroup.position.set(0.31, 1.20, 0);
+      const rightArm = new THREE.Mesh(armGeo, torso.material); rightArm.position.y = -0.25; rightArm.castShadow = true; rightArmGroup.add(rightArm); root.add(rightArmGroup);
+
+      const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      const labelTex = new THREE.CanvasTexture(canvas);
+      const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, depthTest: false }));
+      labelSprite.position.y = 1.95; labelSprite.scale.set(1.5, 0.38, 1); root.add(labelSprite);
+
+      const updateLabel = (name, role) => {
+        ctx.fillStyle = 'rgba(255, 249, 238, 0.92)'; ctx.fillRect(8, 8, 240, 48);
+        ctx.lineWidth = 3; ctx.strokeStyle = (role === 'seeker') ? '#D9822B' : (role === 'found' ? '#756A5B' : '#5B8C5A');
+        ctx.strokeRect(8, 8, 240, 48);
+        ctx.fillStyle = '#2B2620'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(name).slice(0, 12), 128, 32);
+        labelTex.needsUpdate = true;
+      };
+
+      const animateWalk = (speed, time) => {
+        if (speed > 0.1) {
+          const angle = Math.sin(time * 10) * 0.6;
+          leftLegGroup.rotation.x = angle; rightLegGroup.rotation.x = -angle;
+          leftArmGroup.rotation.x = -angle; rightArmGroup.rotation.x = angle;
+        } else {
+          leftLegGroup.rotation.x = 0; rightLegGroup.rotation.x = 0;
+          leftArmGroup.rotation.x = 0; rightArmGroup.rotation.x = 0;
+        }
+      };
+
+      return { root, torso, updateLabel, animateWalk };
+    }
+
+    // ===== BOTS =====
+    class BotHider {
+      constructor(id, name, color) {
+        this.id = id;
+        this.name = name;
+        this.color = color;
+        this.meshObj = createCharacterMesh(color);
+        this.mesh = this.meshObj.root;
+        this.targetSpot = null;
+        this.isFound = false;
+        this.foundOrder = 0;
+        this.pos = new THREE.Vector3();
+        this.yaw = 0;
+        this.lookAtTimer = 0;
+        this.chatCooldown = Math.random() * 20 + 10;
+        this.meshObj.updateLabel(this.name, 'hider');
+      }
+      initSpot(spot) {
+        this.targetSpot = spot;
+        this.pos.set(spot.x, 0, spot.z);
+        this.mesh.position.copy(this.pos);
+        this.mesh.rotation.y = Math.random() * Math.PI * 2;
+        this.isFound = false;
+        this.foundOrder = 0;
+        this.meshObj.updateLabel(this.name, 'hider');
+      }
+      update(dt, time, seekerPos, seekerForward) {
+        if (this.isFound) { this.meshObj.animateWalk(0, time); return; }
+
+        const distToSeeker = this.pos.distanceTo(seekerPos);
+        if (distToSeeker < 6.0) {
+          const toBot = new THREE.Vector3().subVectors(this.pos, seekerPos).normalize();
+          if (seekerForward.dot(toBot) > 0.6) {
+            this.lookAtTimer += dt;
+            if (this.lookAtTimer > 3.0) {
+              const altSpot = HIDE_SPOTS[Math.floor(Math.random() * HIDE_SPOTS.length)];
+              if (altSpot && altSpot !== this.targetSpot) { this.targetSpot = altSpot; this.lookAtTimer = 0; }
+            }
+          } else { this.lookAtTimer = Math.max(0, this.lookAtTimer - dt); }
+        } else { this.lookAtTimer = Math.max(0, this.lookAtTimer - dt); }
+
+        const distToSpot = new THREE.Vector2(this.pos.x - this.targetSpot.x, this.pos.z - this.targetSpot.z).length();
+        if (distToSpot > 0.5) {
+          const dir = new THREE.Vector2(this.targetSpot.x - this.pos.x, this.targetSpot.z - this.pos.z).normalize();
+          this.pos.x += dir.x * CONFIG.walkSpeed * 0.8 * dt;
+          this.pos.z += dir.y * CONFIG.walkSpeed * 0.8 * dt;
+          this.yaw = Math.atan2(dir.x, dir.y);
+          this.mesh.rotation.y = this.yaw;
+          this.meshObj.animateWalk(1.0, time);
+        } else {
+          this.meshObj.animateWalk(0, time);
+        }
+        this.mesh.position.set(this.pos.x, 0, this.pos.z);
+
+        this.chatCooldown -= dt;
+        if (this.chatCooldown <= 0) {
+          this.chatCooldown = Math.random() * 45 + 30;
+          const lines = I18N[curLang].botLines;
+          const line = lines[Math.floor(Math.random() * lines.length)];
+          window.HNS.addChatMessage(this.name, line, this.color);
+        }
+      }
+    }
+
+    // ===== QUESTS =====
+    function spawnQuestItems(scene, questList) {
+      questList.forEach((q) => {
+        if (q.target > 1 && !q.spawned) {
+          q.spawned = true;
+          for (let i = 0; i < q.target; i++) {
+            const spot = HIDE_SPOTS[(i * 4 + 3) % HIDE_SPOTS.length];
+            const item = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshStandardMaterial({ color: '#D9822B', emissive: '#683610', roughness: 0.5 }));
+            item.position.set(spot.x + (Math.random() - 0.5) * 1.5, 0.35, spot.z + (Math.random() - 0.5) * 1.5);
+            item.userData.isWorld = true; scene.add(item);
+            INTERACTABLES.push({ id: `${q.id}_${i}`, questId: q.id, type: 'quest_item', x: item.position.x, z: item.position.z, mesh: item, actionText: q.actionText });
+          }
+        }
+      });
+    }
+
+    // ===== CHAT =====
+    function appendChatMessage(sender, text, color = '#2B2620', isSystem = false) {
+      const list = document.getElementById('chat-messages');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${isSystem ? 'system' : ''}`;
+      const clean = filterProfanity(escapeHTML(text));
+      div.innerHTML = `<span class="chat-sender" style="color:${color};">${escapeHTML(sender)}:</span><span>${clean}</span>`;
+      list.appendChild(div);
+      while (list.children.length > CONFIG.chatMaxMessages) list.removeChild(list.firstChild);
+      list.scrollTop = list.scrollHeight;
+    }
+
+    // ===== INPUT =====
+    // Input handling integrated into state machine and DOM bindings
+
+    // ===== GAME STATE MACHINE =====
+    class HideAndSeekGame {
+      constructor() {
+        this.state = 'MENU';
+        this.prevPlayingState = 'SEEKING';
+        this.mode = 'solo';
+        this.myNick = storageGet('hns_nick', 'Player');
+        this.myRole = 'seeker';
+        this.quality = storageGet('hns_quality', 'med');
+        this.themeId = 'forest';
+        this.seed = 12345;
+        this.rng = mulberry32(this.seed);
+
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.sunLight = null;
+        this.hemiLight = null;
+
+        this.playerMeshObj = null;
+        this.playerMesh = null;
+        this.playerPos = new THREE.Vector3(0, 0, 0);
+        this.playerYaw = 0;
+        this.playerSpeed = 0;
+        this.camDistance = 4.5;
+        this.camHeight = 2.2;
+        this.camCurrentPos = new THREE.Vector3(0, 3, 5);
+
+        this.keys = { forward: false, backward: false, left: false, right: false };
+        this.chatFocused = false;
+
+        this.bots = [];
+        this.remotePlayers = new Map();
+        this.foundList = [];
+        this.totalHidersCount = 10;
+
+        this.roundQuests = [];
+        this.questScores = 0;
+        this.hidingTimer = CONFIG.hidingDuration;
+        this.seekingTimer = CONFIG.seekingDurationSolo;
+        this.activeProposal = null;
+        this.proposalTimeout = null;
+
+        this.hintTimer = 0;
+        this.hintArrowMesh = null;
+        this.netSendTimer = 0;
+      }
+
+      init() {
+        initTextures();
+        const canvas = document.getElementById('game-canvas');
+        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.0;
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.applyQuality(this.quality);
+
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color('#BFE3F5');
+        this.scene.fog = new THREE.Fog('#BFE3F5', 30, CONFIG.arenaSize);
+
+        this.hemiLight = new THREE.HemisphereLight('#FFE3B3', '#E8D9B5', 0.65);
+        this.scene.add(this.hemiLight);
+
+        this.sunLight = new THREE.DirectionalLight('#FFE3B3', 1.15);
+        this.sunLight.position.set(30, 45, 25);
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.camera.near = 0.5;
+        this.sunLight.shadow.camera.far = 140;
+        const d = 45;
+        this.sunLight.shadow.camera.left = -d; this.sunLight.shadow.camera.right = d;
+        this.sunLight.shadow.camera.top = d; this.sunLight.shadow.camera.bottom = -d;
+        this.scene.add(this.sunLight);
+
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
+        this.scene.add(this.camera);
+
+        this.playerMeshObj = createCharacterMesh(getNickColor(this.myNick));
+        this.playerMesh = this.playerMeshObj.root;
+        this.playerMeshObj.updateLabel(this.myNick, this.myRole);
+        this.scene.add(this.playerMesh);
+
+        this.hintArrowMesh = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.1, 8), new THREE.MeshBasicMaterial({ color: '#D9822B' }));
+        this.hintArrowMesh.visible = false;
+        this.scene.add(this.hintArrowMesh);
+
+        window.addEventListener('resize', () => this.onResize());
+        this.onResize();
+        this.bindInputs();
+
+        NET.onMessageCb = (msg) => this.handleNetMessage(msg);
+        NET.onPeerChangeCb = () => this.updateLobbyUI();
+
+        this.applyLanguage();
+      }
+
+      applyQuality(q) {
+        this.quality = q;
+        storageSet('hns_quality', q);
+        const pr = q === 'high' ? Math.min(window.devicePixelRatio, 1.5) : (q === 'med' ? 1.25 : 1.0);
+        this.renderer.setPixelRatio(pr);
+        const mapSize = q === 'high' ? 4096 : (q === 'med' ? 2048 : 1024);
+        if (this.sunLight) {
+          this.sunLight.shadow.mapSize.width = mapSize;
+          this.sunLight.shadow.mapSize.height = mapSize;
+          if (this.sunLight.shadow.map) this.sunLight.shadow.map.dispose();
+          this.sunLight.shadow.map = null;
+        }
+      }
+
+      onResize() {
+        const w = window.innerWidth, h = window.innerHeight;
+        this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+      }
+
+      bindInputs() {
+        window.addEventListener('keydown', (e) => {
+          if (this.chatFocused) {
+            if (e.key === 'Escape') { document.getElementById('chat-input').blur(); this.chatFocused = false; }
+            return;
+          }
+          if (e.key === 'Enter') {
+            e.preventDefault(); const input = document.getElementById('chat-input'); input.focus(); this.chatFocused = true; return;
+          }
+          if (e.key === 'Escape') {
+            if (this.state === 'SEEKING' || this.state === 'HIDING') this.openPause();
+            else if (this.state === 'PAUSED') this.resumePause();
+            return;
+          }
+          if (e.code === 'ArrowUp' || e.code === 'KeyW') this.keys.forward = true;
+          if (e.code === 'ArrowDown' || e.code === 'KeyS') this.keys.backward = true;
+          if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = true;
+          if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = true;
+          if (e.code === 'Space') { e.preventDefault(); this.handleActionKey(); }
+        });
+
+        window.addEventListener('keyup', (e) => {
+          if (e.code === 'ArrowUp' || e.code === 'KeyW') this.keys.forward = false;
+          if (e.code === 'ArrowDown' || e.code === 'KeyS') this.keys.backward = false;
+          if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = false;
+          if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = false;
+        });
+
+        document.getElementById('chat-input').addEventListener('focus', () => {
+          this.chatFocused = true; this.keys.forward = false; this.keys.backward = false; this.keys.left = false; this.keys.right = false;
+        });
+        document.getElementById('chat-input').addEventListener('blur', () => { this.chatFocused = false; });
+      }
+
+      showScreen(id) { showScreen(id); }
+      openModal(id) { openModal(id); }
+      closeModal(id) { closeModal(id); }
+      openPause() { this.prevPlayingState = this.state; this.state = 'PAUSED'; openModal('modal-pause'); }
+      resumePause() { closeModal('modal-pause'); this.state = this.prevPlayingState; }
+
+      applyLanguage() {
+        document.getElementById('lbl-menu-sub').textContent = t('subtitle');
+        document.getElementById('lbl-nickname').textContent = t('nickname');
+        document.getElementById('lbl-btn-solo').textContent = t('btnSolo');
+        document.getElementById('lbl-btn-friends').textContent = t('btnFriends');
+        document.getElementById('lbl-btn-rules').textContent = t('btnRules');
+        document.getElementById('lbl-btn-settings').textContent = t('btnSettings');
+        document.getElementById('lbl-mp-title').textContent = t('mpTitle');
+        document.getElementById('lbl-mp-sub').textContent = t('mpSub');
+        document.getElementById('lbl-btn-create-room').textContent = t('btnCreateRoom');
+        document.getElementById('lbl-btn-join').textContent = t('btnJoin');
+        document.getElementById('lbl-btn-local-test').textContent = t('btnLocalTest');
+        document.getElementById('lbl-wheel-title').textContent = t('wheelTitle');
+        document.getElementById('lbl-wheel-sub').textContent = t('wheelSub');
+        document.getElementById('lbl-btn-spin').textContent = t('btnSpin');
+        document.getElementById('lbl-lobby-title').textContent = t('lobbyTitle');
+        document.getElementById('lbl-lobby-theme').textContent = t('lobbyTheme');
+        document.getElementById('lbl-btn-copy').textContent = t('btnCopy');
+        document.getElementById('lbl-lobby-players').innerHTML = `${t('lobbyPlayers')} (<span id="lobby-player-count">1</span>/10):`;
+        document.getElementById('lbl-fill-bots').textContent = t('fillBots');
+        document.getElementById('lbl-btn-start').textContent = t('btnStart');
+        document.getElementById('lbl-btn-leave-lobby').textContent = t('btnLeaveLobby');
+        document.getElementById('lbl-timer').textContent = t('lblTimer');
+        document.getElementById('lbl-found').textContent = t('lblFound');
+        document.getElementById('lbl-role').textContent = t('lblRole');
+        document.getElementById('lbl-quests-title').textContent = t('questsTitle');
+        document.getElementById('lbl-chat-header').textContent = t('chatHeader');
+        document.getElementById('chat-input').placeholder = t('chatPlaceholder');
+        document.getElementById('blindfold-title').textContent = t('blindfoldTitle');
+        document.getElementById('blindfold-desc').textContent = t('blindfoldDesc');
+        document.getElementById('lbl-end-title').textContent = t('endTitle');
+        document.getElementById('lbl-end-sub').textContent = t('endSub');
+        document.getElementById('th-player').textContent = t('thPlayer');
+        document.getElementById('th-status').textContent = t('thStatus');
+        document.getElementById('th-order').textContent = t('thOrder');
+        document.getElementById('th-score').textContent = t('thScore');
+        document.getElementById('lbl-next-seeker-title').textContent = t('nextSeekerTitle');
+        document.getElementById('lbl-btn-next-round').textContent = t('btnNextRound');
+        document.getElementById('lbl-btn-new-theme').textContent = t('btnNewTheme');
+        document.getElementById('lbl-btn-end-menu').textContent = t('btnEndMenu');
+        document.getElementById('lbl-rules-title').textContent = t('rulesTitle');
+        document.getElementById('lbl-rules-close').textContent = t('rulesClose');
+        document.getElementById('rules-content').innerHTML = t('rulesContent');
+        document.getElementById('lbl-settings-title').textContent = t('settingsTitle');
+        document.getElementById('lbl-settings-save').textContent = t('settingsSave');
+        document.getElementById('lbl-set-lang').textContent = t('setLang');
+        document.getElementById('btn-set-lang-toggle').textContent = curLang === 'uk' ? 'Українська' : 'English';
+        document.getElementById('lbl-set-quality').textContent = t('setQuality');
+        document.getElementById('lbl-set-sound').textContent = t('setSound');
+        document.getElementById('btn-set-sound-toggle').textContent = audio.muted ? t('soundOff') : t('soundOn');
+        document.getElementById('lbl-pause-title').textContent = t('pauseTitle');
+        document.getElementById('lbl-pause-resume').textContent = t('pauseResume');
+        document.getElementById('lbl-pause-rules').textContent = t('pauseRules');
+        document.getElementById('lbl-pause-settings').textContent = t('pauseSettings');
+        document.getElementById('lbl-pause-leave').textContent = t('pauseLeave');
+
+        if (this.playerMeshObj) this.playerMeshObj.updateLabel(this.myNick, this.myRole);
+        this.updateHUD();
+        if (this.renderWheelStatic) this.renderWheelStatic();
+      }
+
+      setLanguage(lang) { curLang = lang; storageSet('hns_lang', lang); this.applyLanguage(); }
+      toggleLanguage() { this.setLanguage(curLang === 'uk' ? 'en' : 'uk'); }
+
+      startWheel(onFinished) {
+        this.state = 'WHEEL'; showScreen('screen-wheel');
+        const canvas = document.getElementById('wheel-canvas');
+        const ctx = canvas.getContext('2d');
+        const btnSpin = document.getElementById('btn-spin-wheel');
+        const resText = document.getElementById('wheel-result');
+        resText.textContent = '...';
+
+        const chosenIndex = Math.floor(Math.random() * CONFIG.themes.length);
+        this.themeId = CONFIG.themes[chosenIndex].id;
+        const themes = CONFIG.themes;
+        const segAngle = (Math.PI * 2) / themes.length;
+        let curAngle = 0, spinning = false;
+
+        const drawWheel = (angle) => {
+          ctx.clearRect(0, 0, 300, 300); ctx.save(); ctx.translate(150, 150); ctx.rotate(angle);
+          for (let i = 0; i < themes.length; i++) {
+            const th = themes[i]; const startA = i * segAngle; const endA = startA + segAngle;
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 140, startA, endA);
+            ctx.fillStyle = th.color; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#D8C8AA'; ctx.stroke();
+            ctx.save(); ctx.rotate(startA + segAngle / 2); ctx.textAlign = 'right';
+            ctx.fillStyle = '#FFF9EE'; ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(t('themeNames')[th.id] || th.id, 126, 5); ctx.restore();
+          }
+          ctx.beginPath(); ctx.arc(0, 0, 24, 0, Math.PI * 2); ctx.fillStyle = '#FFF9EE'; ctx.fill();
+          ctx.lineWidth = 3; ctx.strokeStyle = '#D8C8AA'; ctx.stroke(); ctx.restore();
+        };
+
+        this.renderWheelStatic = () => drawWheel(curAngle);
+        drawWheel(0);
+
+        btnSpin.onclick = () => {
+          if (spinning) return;
+          spinning = true; btnSpin.disabled = true;
+          const targetSliceMid = (chosenIndex + 0.5) * segAngle;
+          const fullRotations = 5 * Math.PI * 2;
+          const finalAngle = fullRotations + (Math.PI * 1.5 - targetSliceMid);
+          const duration = 4800, startTime = performance.now();
+          let lastTickSlice = -1;
+
+          const animateSpin = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1.0, elapsed / duration);
+            curAngle = (1 - Math.pow(1 - progress, 3)) * finalAngle;
+            drawWheel(curAngle);
+
+            const currentSlice = Math.floor((((Math.PI * 1.5 - curAngle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) / segAngle);
+            if (currentSlice !== lastTickSlice) { audio.playTick(); lastTickSlice = currentSlice; }
+
+            if (progress < 1.0) {
+              requestAnimationFrame(animateSpin);
+            } else {
+              audio.playWheelWin();
+              resText.textContent = t('themeNames')[this.themeId];
+              setTimeout(() => { btnSpin.disabled = false; if (onFinished) onFinished(this.themeId); }, 1200);
+            }
+          };
+          requestAnimationFrame(animateSpin);
+        };
+      }
+
+      startSoloGame() {
+        this.mode = 'solo';
+        this.myNick = document.getElementById('input-nick').value.trim() || 'Player';
+        storageSet('hns_nick', this.myNick);
+        this.myRole = 'seeker';
+        this.startWheel((theme) => {
+          this.themeId = theme;
+          this.loadRound(theme, Math.floor(Math.random() * 999999));
+        });
+      }
+
+      loadRound(themeId, seed) {
+        this.themeId = themeId; this.seed = seed; this.rng = mulberry32(seed);
+        switch (themeId) {
+          case 'forest': buildForest(this.scene, this.rng); break;
+          case 'school': buildSchool(this.scene, this.rng); break;
+          case 'aquapark': buildAquapark(this.scene, this.rng); break;
+          case 'playground': buildPlaygroundPark(this.scene, this.rng); break;
+          case 'mountains': buildMountains(this.scene, this.rng); break;
+        }
+
+        const pool = I18N[curLang].quests[themeId] || I18N['en'].quests[themeId];
+        this.roundQuests = pool.slice(0, 3).map(q => ({ ...q, current: 0, completed: false, spawned: false }));
+        spawnQuestItems(this.scene, this.roundQuests);
+
+        this.playerPos.set(0, 0, 0); this.playerYaw = 0; this.playerMesh.position.set(0, 0, 0);
+        this.foundList = [];
+        this.bots.forEach(b => this.scene.remove(b.mesh));
+        this.bots = [];
+
+        if (this.mode === 'solo' || (NET.isHost && document.getElementById('check-fill-bots').checked)) {
+          const names = I18N[curLang].botNames;
+          const botCount = (this.mode === 'solo') ? 10 : Math.max(0, 10 - (NET.connections.size + 1));
+          for (let i = 0; i < botCount; i++) {
+            const bot = new BotHider(i, names[i % names.length], NICK_COLORS[i % NICK_COLORS.length]);
+            bot.initSpot(HIDE_SPOTS[i % HIDE_SPOTS.length]);
+            this.scene.add(bot.mesh);
+            this.bots.push(bot);
+          }
+          this.totalHidersCount = botCount;
+        }
+
+        this.state = 'HIDING';
+        this.hidingTimer = CONFIG.hidingDuration;
+        this.seekingTimer = (this.mode === 'solo') ? CONFIG.seekingDurationSolo : CONFIG.seekingDurationMP;
+        showScreen(null);
+        document.getElementById('hud').style.display = 'block';
+
+        if (this.myRole === 'seeker') {
+          document.getElementById('blindfold-overlay').style.display = 'flex';
+          audio.playBeep(440, 0.2);
+        } else {
+          document.getElementById('blindfold-overlay').style.display = 'none';
+        }
+
+        this.updateHUD();
+        this.addChatMessage('System', `Раунд розпочато! Локація: ${t('themeNames')[this.themeId]}`, '#D9822B', true);
+      }
+
+      updateHUD() {
+        const timerVal = Math.max(0, Math.ceil(this.state === 'HIDING' ? this.hidingTimer : this.seekingTimer));
+        const mins = Math.floor(timerVal / 60); const secs = timerVal % 60;
+        document.getElementById('val-timer').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        document.getElementById('val-found').textContent = `${this.foundList.length} / ${this.totalHidersCount}`;
+
+        let roleText = t('roleSeeker');
+        if (this.myRole === 'hider') roleText = t('roleHider');
+        if (this.myRole === 'spectator') roleText = t('roleSpectator');
+        document.getElementById('val-role').textContent = roleText;
+
+        const qList = document.getElementById('quest-list'); qList.innerHTML = '';
+        this.roundQuests.forEach((q) => {
+          const div = document.createElement('div');
+          div.className = `quest-item ${q.completed ? 'completed' : ''}`;
+          const pct = Math.min(100, Math.round((q.current / q.target) * 100));
+          div.innerHTML = `<div class="quest-desc"><span>${q.text}</span><span>${q.current}/${q.target}</span></div><div class="quest-bar-bg"><div class="quest-bar-fill" style="width:${pct}%;"></div></div>`;
+          qList.appendChild(div);
+        });
+
+        const needle = document.getElementById('compass-needle');
+        if (needle) needle.style.transform = `rotate(${-this.playerYaw}rad)`;
+      }
+
+      handleActionKey() {
+        if (this.state !== 'SEEKING') return;
+
+        if (this.myRole === 'seeker') {
+          const forward = new THREE.Vector3(Math.sin(this.playerYaw), 0, Math.cos(this.playerYaw));
+          for (const bot of this.bots) {
+            if (!bot.isFound && this.playerPos.distanceTo(bot.pos) <= CONFIG.findDistance) {
+              const toBot = new THREE.Vector3().subVectors(bot.pos, this.playerPos).normalize();
+              if (forward.dot(toBot) >= CONFIG.findConeCos) {
+                this.findHider(bot.id, bot.name); return;
+              }
+            }
+          }
+          this.remotePlayers.forEach((p, pid) => {
+            if (!p.isFound && p.role === 'hider' && this.playerPos.distanceTo(p.pos) <= CONFIG.findDistance) {
+              const toP = new THREE.Vector3().subVectors(p.pos, this.playerPos).normalize();
+              if (forward.dot(toP) >= CONFIG.findConeCos) {
+                this.findHider(pid, p.name);
+                if (NET.mode !== 'solo') NET.send('found', { id: pid, name: p.name });
+                return;
+              }
+            }
+          });
+        }
+
+        for (const item of INTERACTABLES) {
+          if (new THREE.Vector2(this.playerPos.x - item.x, this.playerPos.z - item.z).length() <= 2.8) {
+            this.interactWithQuest(item); return;
+          }
+        }
+      }
+
+      findHider(id, name) {
+        const order = this.foundList.length + 1;
+        this.foundList.push({ id, name, order, time: Date.now() });
+        audio.playFind();
+        showToast(`Знайдено: ${name} (#${order})!`);
+        this.addChatMessage('System', `Шукач знайшов ${name}! (черга: #${order})`, '#5B8C5A', true);
+
+        const bot = this.bots.find(b => b.id === id);
+        if (bot) { bot.isFound = true; bot.foundOrder = order; bot.meshObj.updateLabel(bot.name, 'found'); }
+
+        const remote = this.remotePlayers.get(id);
+        if (remote) { remote.isFound = true; remote.meshObj.updateLabel(remote.name, 'found'); }
+
+        this.updateHUD();
+        if (this.foundList.length >= this.totalHidersCount) this.endRound();
+      }
+
+      interactWithQuest(item) {
+        const quest = this.roundQuests.find(q => q.id === (item.questId || item.id || item.questGroup));
+        if (quest && !quest.completed) {
+          quest.current++; audio.playQuestDing();
+          if (item.type === 'quest_item' && item.mesh) {
+            this.scene.remove(item.mesh);
+            const idx = INTERACTABLES.indexOf(item);
+            if (idx >= 0) INTERACTABLES.splice(idx, 1);
+          }
+          if (quest.current >= quest.target) {
+            quest.completed = true; this.applyQuestReward(quest.reward);
+          }
+          this.updateHUD();
+          if (NET.mode !== 'solo') {
+            NET.send('quest_progress', { questId: quest.id, current: quest.current, completed: quest.completed });
+          }
+        }
+      }
+
+      applyQuestReward(rewardType) {
+        showToast(`${t('toastQuestDone')} ${t('rewards')[rewardType] || rewardType}`);
+        audio.playWheelWin();
+        if (rewardType === 'hint') { this.hintTimer = 5.0; this.hintArrowMesh.visible = true; }
+        else if (rewardType === 'time') { this.seekingTimer += 20; }
+        else if (rewardType === 'speed') { CONFIG.walkSpeed = 4.2; setTimeout(() => { CONFIG.walkSpeed = 3.2; }, 10000); }
+        else if (rewardType === 'points') { this.questScores += 150; }
+      }
+
+      checkCollisions(newX, newZ, radius = 0.35) {
+        const half = CONFIG.arenaSize / 2 - 1.5;
+        let x = clamp(newX, -half, half); let z = clamp(newZ, -half, half);
+        for (const col of WORLD_COLLIDERS) {
+          if (col.type === 'box') {
+            if (x + radius > col.minX && x - radius < col.maxX && z + radius > col.minZ && z - radius < col.maxZ) {
+              const dx1 = Math.abs((x + radius) - col.minX), dx2 = Math.abs((x - radius) - col.maxX);
+              const dz1 = Math.abs((z + radius) - col.minZ), dz2 = Math.abs((z - radius) - col.maxZ);
+              const minOverlap = Math.min(dx1, dx2, dz1, dz2);
+              if (minOverlap === dx1) x = col.minX - radius;
+              else if (minOverlap === dx2) x = col.maxX + radius;
+              else if (minOverlap === dz1) z = col.minZ - radius;
+              else if (minOverlap === dz2) z = col.maxZ + radius;
+            }
+          } else if (col.type === 'cylinder') {
+            const dist = Math.sqrt((x - col.x) * (x - col.x) + (z - col.z) * (z - col.z));
+            const minDist = col.radius + radius;
+            if (dist < minDist) {
+              const angle = Math.atan2(z - col.z, x - col.x);
+              x = col.x + Math.cos(angle) * minDist; z = col.z + Math.sin(angle) * minDist;
+            }
+          }
+        }
+        return { x, z };
+      }
+
+      update(dt, time) {
+        if (this.state === 'PAUSED' || this.state === 'MENU' || this.state === 'ROUND_END') return;
+
+        if (this.state === 'HIDING') {
+          this.hidingTimer -= dt;
+          document.getElementById('blindfold-countdown').textContent = Math.ceil(this.hidingTimer);
+          if (this.hidingTimer <= 0) {
+            this.state = 'SEEKING';
+            document.getElementById('blindfold-overlay').style.display = 'none';
+            audio.playBeep(880, 0.4);
+            showToast('Час шукати! Шукач рушає!');
+          }
+        }
+
+        if (this.state === 'SEEKING') {
+          this.seekingTimer -= dt;
+          if (this.seekingTimer <= 0) this.endRound();
+        }
+
+        if (!this.chatFocused && (this.state === 'SEEKING' || (this.state === 'HIDING' && this.myRole !== 'seeker'))) {
+          if (this.keys.left) this.playerYaw += CONFIG.turnSpeed * dt;
+          if (this.keys.right) this.playerYaw -= CONFIG.turnSpeed * dt;
+
+          let moveSpeed = 0;
+          if (this.keys.forward) moveSpeed = CONFIG.walkSpeed;
+          if (this.keys.backward) moveSpeed = -CONFIG.walkSpeed * 0.6;
+
+          if (moveSpeed !== 0) {
+            const dx = Math.sin(this.playerYaw) * moveSpeed * dt;
+            const dz = Math.cos(this.playerYaw) * moveSpeed * dt;
+            const resolved = this.checkCollisions(this.playerPos.x + dx, this.playerPos.z + dz);
+            this.playerPos.x = resolved.x; this.playerPos.z = resolved.z;
+            this.playerSpeed = Math.abs(moveSpeed);
+            if (Math.sin(time * 8) > 0.9) audio.playStep();
+          } else {
+            this.playerSpeed = 0;
+          }
+        } else {
+          this.playerSpeed = 0;
+        }
+
+        this.playerMesh.position.set(this.playerPos.x, 0, this.playerPos.z);
+        this.playerMesh.rotation.y = this.playerYaw;
+        this.playerMeshObj.animateWalk(this.playerSpeed, time);
+
+        const seekerForward = new THREE.Vector3(Math.sin(this.playerYaw), 0, Math.cos(this.playerYaw));
+        for (const bot of this.bots) bot.update(dt, time, this.playerPos, seekerForward);
+
+        this.remotePlayers.forEach((rp) => {
+          if (rp.targetPos) {
+            rp.pos.lerp(rp.targetPos, 0.25);
+            rp.meshObj.root.position.copy(rp.pos);
+            rp.meshObj.root.rotation.y = rp.yaw || 0;
+            rp.meshObj.animateWalk(rp.speed || 0, time);
+          }
+        });
+
+        const camTargetX = this.playerPos.x - Math.sin(this.playerYaw) * this.camDistance;
+        const camTargetZ = this.playerPos.z - Math.cos(this.playerYaw) * this.camDistance;
+        this.camCurrentPos.x = lerp(this.camCurrentPos.x, camTargetX, 0.12);
+        this.camCurrentPos.y = lerp(this.camCurrentPos.y, this.playerPos.y + this.camHeight, 0.12);
+        this.camCurrentPos.z = lerp(this.camCurrentPos.z, camTargetZ, 0.12);
+
+        const camResolved = this.checkCollisions(this.camCurrentPos.x, this.camCurrentPos.z, 0.4);
+        this.camera.position.set(camResolved.x, this.camCurrentPos.y, camResolved.z);
+        this.camera.lookAt(this.playerPos.x, this.playerPos.y + 1.2, this.playerPos.z);
+
+        if (this.hintTimer > 0) {
+          this.hintTimer -= dt;
+          let nearestBot = null, minDist = 999;
+          for (const b of this.bots) {
+            if (!b.isFound) {
+              const d = this.playerPos.distanceTo(b.pos);
+              if (d < minDist) { minDist = d; nearestBot = b; }
+            }
+          }
+          if (nearestBot) {
+            this.hintArrowMesh.position.set(this.playerPos.x, 2.5, this.playerPos.z);
+            this.hintArrowMesh.lookAt(nearestBot.pos.x, 2.5, nearestBot.pos.z);
+            this.hintArrowMesh.rotateX(Math.PI / 2);
+          }
+          if (this.hintTimer <= 0) this.hintArrowMesh.visible = false;
+        }
+
+        this.updateActionPrompt();
+        this.updateHUD();
+
+        if (NET.mode !== 'solo') {
+          this.netSendTimer += dt;
+          if (this.netSendTimer >= (1 / CONFIG.netSnapshotRate)) {
+            this.netSendTimer = 0;
+            if (NET.isHost) {
+              NET.broadcast('snapshot', {
+                phase: this.state, hidingTimer: this.hidingTimer, seekingTimer: this.seekingTimer,
+                foundList: this.foundList, hostPos: { x: this.playerPos.x, z: this.playerPos.z, yaw: this.playerYaw, speed: this.playerSpeed }
+              });
+            } else {
+              NET.send('input', { x: this.playerPos.x, z: this.playerPos.z, yaw: this.playerYaw, speed: this.playerSpeed });
+            }
+          }
+        }
+      }
+
+      updateActionPrompt() {
+        const promptEl = document.getElementById('hud-prompt');
+        const promptText = document.getElementById('prompt-text');
+
+        if (this.myRole === 'seeker' && this.state === 'SEEKING') {
+          for (const bot of this.bots) {
+            if (!bot.isFound && this.playerPos.distanceTo(bot.pos) <= CONFIG.findDistance) {
+              promptText.textContent = `${t('promptFind')} ${bot.name}`;
+              promptEl.style.display = 'block'; return;
+            }
+          }
+        }
+
+        for (const item of INTERACTABLES) {
+          if (new THREE.Vector2(this.playerPos.x - item.x, this.playerPos.z - item.z).length() <= 2.8) {
+            promptText.textContent = item.actionText || t('promptInteract');
+            promptEl.style.display = 'block'; return;
+          }
+        }
+        promptEl.style.display = 'none';
+      }
+
+      endRound() {
+        this.state = 'ROUND_END';
+        document.getElementById('hud').style.display = 'none';
+        document.getElementById('blindfold-overlay').style.display = 'none';
+        showScreen('screen-round-end');
+
+        const tbody = document.getElementById('end-stats-body'); tbody.innerHTML = '';
+        let nextSeekerName = this.myNick;
+        if (this.foundList.length > 0) nextSeekerName = this.foundList[0].name;
+        document.getElementById('end-next-seeker').textContent = nextSeekerName;
+
+        const seekerPoints = this.foundList.length * 100 + Math.max(0, Math.floor(this.seekingTimer) * 2) + this.questScores;
+        const trSeeker = document.createElement('tr');
+        trSeeker.innerHTML = `<td><span class="player-tag" style="background:${getNickColor(this.myNick)};"></span>${this.myNick} (${t('roleSeeker')})</td><td>-</td><td>-</td><td><b>${seekerPoints}</b></td>`;
+        tbody.appendChild(trSeeker);
+
+        this.bots.forEach(b => {
+          const tr = document.createElement('tr');
+          const isF = b.isFound;
+          const pts = isF ? Math.max(10, Math.floor((10 - b.foundOrder) * 15)) : 150;
+          tr.innerHTML = `<td><span class="player-tag" style="background:${b.color};"></span>${b.name}</td><td>${isF ? t('statusFound') : t('statusHidden')}</td><td>${isF ? `#${b.foundOrder}` : '-'}</td><td>${pts}</td>`;
+          tbody.appendChild(tr);
+        });
+
+        if (NET.mode !== 'solo' && NET.isHost) NET.broadcast('roundEnd', { nextSeeker: nextSeekerName });
+      }
+
+      addChatMessage(sender, text, color = '#2B2620', isSystem = false) {
+        appendChatMessage(sender, text, color, isSystem);
+      }
+
+      sendChat() {
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+
+        if (text.startsWith('/')) { this.handleCommand(text); return; }
+
+        this.addChatMessage(this.myNick, text, getNickColor(this.myNick));
+        if (NET.mode !== 'solo') NET.send('chat', { sender: this.myNick, text, color: getNickColor(this.myNick) });
+      }
+
+      handleCommand(cmd) {
+        const parts = cmd.split(' ');
+        const action = parts[0].toLowerCase();
+        if (action === '/help') {
+          const div = document.createElement('div');
+          div.className = 'chat-msg help'; div.textContent = t('chatHelp');
+          document.getElementById('chat-messages').appendChild(div); return;
+        }
+        if (action === '/seeker' && parts[1]) {
+          const candidate = parts[1];
+          this.activeProposal = { type: 'seeker', target: candidate, yes: 1, no: 0, voters: new Set([this.myNick]) };
+          this.addChatMessage('System', `Голосування: призначити ${candidate} шукачем? Пишіть /yes або /no`, '#D9822B', true);
+          if (this.proposalTimeout) clearTimeout(this.proposalTimeout);
+          this.proposalTimeout = setTimeout(() => {
+            if (this.activeProposal) {
+              const passed = this.activeProposal.yes > this.activeProposal.no;
+              this.addChatMessage('System', `Голосування завершено! Результат: ${passed ? 'ПРИЙНЯТО' : 'ВІДХИЛЕНО'}`, '#756A5B', true);
+              if (passed && candidate === this.myNick) {
+                this.myRole = 'seeker'; this.playerMeshObj.updateLabel(this.myNick, 'seeker');
+              }
+              this.activeProposal = null;
+            }
+          }, 20000);
+          return;
+        }
+        if (action === '/yes' || action === '/no') {
+          if (!this.activeProposal) { this.addChatMessage('System', 'Наразі немає активного голосування.', '#756A5B', true); return; }
+          if (this.activeProposal.voters.has(this.myNick)) { this.addChatMessage('System', 'Ви вже проголосували!', '#756A5B', true); return; }
+          this.activeProposal.voters.add(this.myNick);
+          if (action === '/yes') this.activeProposal.yes++; else this.activeProposal.no++;
+          this.addChatMessage('System', `Голос зараховано! За: ${this.activeProposal.yes}, Проти: ${this.activeProposal.no}`, '#756A5B', true);
+          return;
+        }
+        this.addChatMessage('System', 'Невідома команда. Введіть /help', '#756A5B', true);
+      }
+
+      createRoom(isLocal = false) {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        this.myNick = document.getElementById('input-nick').value.trim() || 'Host';
+        storageSet('hns_nick', this.myNick);
+
+        if (isLocal) {
+          NET.initBroadcast(code, true, this.myNick, (m) => this.handleNetMessage(m), () => this.updateLobbyUI());
+        } else {
+          NET.initPeerJS(code, true, this.myNick, (m) => this.handleNetMessage(m), () => this.updateLobbyUI(), (err) => showToast(`PeerJS: ${err}`));
+        }
+
+        document.getElementById('lobby-code-badge').textContent = code;
+        this.startWheel((theme) => {
+          this.themeId = theme;
+          document.getElementById('lobby-theme-name').textContent = t('themeNames')[theme];
+          showScreen('screen-lobby');
+          this.updateLobbyUI();
+        });
+      }
+
+      joinRoom(code) {
+        this.myNick = document.getElementById('input-nick').value.trim() || 'Player';
+        storageSet('hns_nick', this.myNick);
+        code = code.toUpperCase().trim();
+        NET.initBroadcast(code, false, this.myNick, (m) => this.handleNetMessage(m), () => this.updateLobbyUI());
+        document.getElementById('lobby-code-badge').textContent = code;
+        showScreen('screen-lobby');
+        this.updateLobbyUI();
+      }
+
+      updateLobbyUI() {
+        const countSpan = document.getElementById('lobby-player-count');
+        const listDiv = document.getElementById('lobby-player-list');
+        listDiv.innerHTML = '';
+        const myTag = document.createElement('div');
+        myTag.style.display = 'flex'; myTag.style.alignItems = 'center'; myTag.style.gap = '6px';
+        myTag.innerHTML = `<span class="player-tag" style="background:${getNickColor(this.myNick)};"></span><b>${this.myNick}</b> (${NET.isHost ? 'Host' : 'You'})`;
+        listDiv.appendChild(myTag);
+
+        NET.connections.forEach((conn, pid) => {
+          const div = document.createElement('div');
+          div.style.display = 'flex'; div.style.alignItems = 'center'; div.style.gap = '6px';
+          div.innerHTML = `<span class="player-tag" style="background:${getNickColor(pid)};"></span>${pid}`;
+          listDiv.appendChild(div);
+        });
+        countSpan.textContent = NET.connections.size + 1;
+      }
+
+      startMultiplayerRound() {
+        if (!NET.isHost) return;
+        const seed = Math.floor(Math.random() * 999999);
+        NET.broadcast('start', { theme: this.themeId, seed });
+        this.loadRound(this.themeId, seed);
+      }
+
+      leaveLobby() {
+        NET.disconnect();
+        showScreen('screen-menu');
+      }
+
+      handleNetMessage(msg) {
+        if (!msg) return;
+        if (msg.type === 'chat') this.addChatMessage(msg.payload.sender, msg.payload.text, msg.payload.color);
+        else if (msg.type === 'found') this.findHider(msg.payload.id, msg.payload.name);
+        else if (msg.type === 'start') this.loadRound(msg.payload.theme, msg.payload.seed);
+        else if (msg.type === 'snapshot' && !NET.isHost) {
+          this.hidingTimer = msg.payload.hidingTimer;
+          this.seekingTimer = msg.payload.seekingTimer;
+          this.foundList = msg.payload.foundList || [];
+          this.updateHUD();
+        } else if (msg.type === 'roundEnd') {
+          this.endRound();
+        }
+      }
+    }
+
+    // ===== RENDER LOOP =====
+    let lastTime = performance.now();
+    function loop(now) {
+      requestAnimationFrame(loop);
+      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      lastTime = now;
+      if (window.HNS) {
+        window.HNS.update(dt, now * 0.001);
+        window.HNS.renderer.render(window.HNS.scene, window.HNS.camera);
+      }
+    }
+
+    // ===== INIT =====
+    window.addEventListener('DOMContentLoaded', () => {
+      window.HNS = new HideAndSeekGame();
+      window.HNS.init();
+
+      document.getElementById('btn-lang-toggle').onclick = () => window.HNS.toggleLanguage();
+      document.getElementById('btn-set-lang-toggle').onclick = () => window.HNS.toggleLanguage();
+      document.getElementById('btn-play-solo').onclick = () => window.HNS.startSoloGame();
+      document.getElementById('btn-play-friends').onclick = () => showScreen('screen-multiplayer');
+      document.getElementById('btn-rules').onclick = () => openModal('modal-rules');
+      document.getElementById('btn-settings').onclick = () => openModal('modal-settings');
+
+      document.getElementById('btn-mp-create').onclick = () => window.HNS.createRoom(false);
+      document.getElementById('btn-mp-local').onclick = () => window.HNS.createRoom(true);
+      document.getElementById('btn-mp-join').onclick = () => {
+        const code = document.getElementById('input-room-code').value.trim();
+        if (code) window.HNS.joinRoom(code);
+      };
+
+      document.getElementById('btn-lobby-start').onclick = () => window.HNS.startMultiplayerRound();
+
+      document.getElementById('btn-pause').onclick = () => window.HNS.openPause();
+      document.getElementById('btn-pause-resume').onclick = () => window.HNS.resumePause();
+      document.getElementById('btn-pause-rules').onclick = () => openModal('modal-rules');
+      document.getElementById('btn-pause-settings').onclick = () => openModal('modal-settings');
+      document.getElementById('btn-pause-leave').onclick = () => {
+        window.HNS.resumePause();
+        showScreen('screen-menu');
+        document.getElementById('hud').style.display = 'none';
+      };
+
+      document.getElementById('btn-next-round').onclick = () => {
+        window.HNS.loadRound(window.HNS.themeId, Math.floor(Math.random() * 999999));
+      };
+      document.getElementById('btn-end-wheel').onclick = () => {
+        window.HNS.startWheel((th) => window.HNS.loadRound(th, Math.floor(Math.random() * 999999)));
+      };
+
+      document.getElementById('btn-copy-link').onclick = () => {
+        const code = document.getElementById('lobby-code-badge').textContent;
+        const link = `${window.location.origin}${window.location.pathname}?room=${code}`;
+        navigator.clipboard.writeText(link).then(() => showToast(t('copiedToast')));
+      };
+
+      document.getElementById('btn-set-sound-toggle').onclick = () => {
+        audio.muted = !audio.muted;
+        storageSet('hns_sound', audio.muted ? 'false' : 'true');
+        document.getElementById('btn-set-sound-toggle').textContent = audio.muted ? t('soundOff') : t('soundOn');
+      };
+
+      document.querySelectorAll('.q-btn').forEach(btn => {
+        btn.onclick = () => window.HNS.applyQuality(btn.getAttribute('data-q'));
+      });
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        document.getElementById('input-room-code').value = roomParam;
+        showScreen('screen-multiplayer');
+      }
+
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>
+

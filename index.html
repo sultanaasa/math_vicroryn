@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hide & Seek</title><link rel="stylesheet" href="style.css"></head>
+<body>
+  <main>
+    <section id="menu" class="screen active">
+      <div class="cloud c1"></div><div class="cloud c2"></div>
+      <div class="card menu-card"><div class="logo">🕵️‍♀️ <span>Hide</span> &amp; Seek 🌳</div><p>Find your friends. Stay hidden. Have fun!</p>
+        <label class="input-label">Your nickname<input id="nameInput" maxlength="16" placeholder="e.g. SunnySam" autocomplete="off"></label>
+        <button id="createBtn" class="primary">Create Game <b>→</b></button>
+        <div class="or"><i></i> or join friends <i></i></div>
+        <div class="join-row"><input id="codeInput" maxlength="5" placeholder="GAME CODE" autocomplete="off"><button id="joinBtn" class="secondary">Join Game</button></div>
+        <p id="menuError" class="error"></p>
+      </div>
+    </section>
+    <section id="lobby" class="screen">
+      <div class="card lobby-card"><span class="eyebrow">YOUR GAME CODE</span><div id="gameCode" class="game-code">-----</div><p class="hint">Share this code with your friends!</p>
+        <div class="lobby-heading"><h1>Friends in the lobby</h1><span id="playerCount" class="count">0 players</span></div><div id="playerList" class="player-list"></div>
+        <p id="hostNote" class="hint"></p><button id="startBtn" class="primary" disabled>Start Game ✨</button>
+      </div>
+    </section>
+    <section id="spinScreen" class="screen"><div class="card wheel-card"><p class="eyebrow">WHO WILL SEEK?</p><h1>Picking the Seeker...</h1><div class="wheel-wrap"><div class="pointer">▼</div><div id="wheel" class="wheel"></div></div><h2 id="winnerText"></h2></div></section>
+    <section id="game" class="screen game-screen"><header><div><span class="eyebrow">ROUND TIME</span><strong id="timer">2:00</strong></div><div id="roleBadge" class="role"></div><div class="code-mini">ROOM <b id="miniCode"></b></div></header><div class="map-wrap"><canvas id="map" width="1000" height="600"></canvas><div id="controls" class="controls">Use <b>W A S D</b> or <b>arrow keys</b> to move</div></div></section>
+    <section id="endScreen" class="screen"><div class="card end-card"><div class="end-emoji">🎉</div><p class="eyebrow">TIME'S UP!</p><h1>Round Over!</h1><p id="endSeeker"></p><div><h3>Hiders who survived</h3><div id="survivors" class="survivors"></div></div><button id="againBtn" class="primary">Play Again ↻</button><p id="againNote" class="hint"></p></div></section>
+  </main><script src="script.js"></script>
+</body></html>
